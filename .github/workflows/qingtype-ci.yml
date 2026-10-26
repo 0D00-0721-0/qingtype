@@ -23,19 +23,13 @@ jobs:
           path: build/rime-ice-fixture
       - name: Fetch the pinned Rime headers
         run: git submodule update --init --depth 1 librime
-      - name: Extract the upstream runtime without installing it
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/qingtype-runtime"
-          gh release download 1.1.2 --repo rime/squirrel --pattern Squirrel-1.1.2.pkg --dir "$RUNNER_TEMP/qingtype-runtime"
-          pkgutil --expand-full "$RUNNER_TEMP/qingtype-runtime/Squirrel-1.1.2.pkg" "$RUNNER_TEMP/qingtype-runtime/expanded"
-          runtime_app=$(find "$RUNNER_TEMP/qingtype-runtime/expanded" -type d -name Squirrel.app -print -quit)
-          test -n "$runtime_app"
-          echo "QINGTYPE_RUNTIME_APP=$runtime_app" >> "$GITHUB_ENV"
       - name: Build QingType and settings
         run: ./scripts/build-dev.sh
       - name: Run isolated engine, UI contract and data-safety checks
         env:
           QINGTYPE_RIME_ICE_TEST_PACKAGE: ${{ github.workspace }}/build/rime-ice-fixture
         run: ./scripts/test.sh
+      - name: Build and inspect the installable preview
+        run: |
+          ./scripts/package-app.sh
+          python3 tests/DistributionTests.py

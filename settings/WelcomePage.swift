@@ -1,0 +1,157 @@
+import AppKit
+import SwiftUI
+
+extension SettingsModel {
+  func refreshInstallation() {
+    installedVersion = InstallationService.installedVersion
+    Task { inputEnabled = (try? await InstallationService.state().enabled) ?? false }
+  }
+
+  func installInputMethod() {
+    guard !busy, !loadFailed else { return }
+    guard !isDirty else { failed = true; message = "请先保存当前更改，再安装或修复输入法。"; return }
+    busy = true; failed = false; message = "正在安装清言并准备基础中文输入…"
+    Task {
+      defer { busy = false; refreshInstallation() }
+      do {
+        deployment = try await InstallationService.install()
+        settings = try .load(); saved = settings
+        message = "清言已安装并启用，可以从系统输入菜单选择清言开始输入。"
+      } catch { failed = true; message = error.localizedDescription }
+    }
+  }
+
+  func downloadWanxiang() {
+    guard !busy, !loadFailed, inputReady else { return }
+    guard !isDirty else { failed = true; message = "请先保存当前更改，再安装万象模型。"; return }
+    let original = saved
+    busy = true; failed = false; canCancelDownload = true
+    transferProgress = nil; message = "正在获取万象官方模型信息…"
+    componentTask = Task {
+      defer { busy = false; canCancelDownload = false; transferProgress = nil; componentTask = nil }
+      var downloaded: QingTypeDownloadedAsset?
+      defer { if let downloaded { try? FileManager.default.removeItem(at: downloaded.directory) } }
+      do {
+        downloaded = try await QingTypeWanxiang.download(schema: original.schema) { [self] progress in
+          Task { @MainActor in if self.canCancelDownload { self.transferProgress = progress; self.message = "正在下载万象模型…" } }
+        }
+        try Task.checkCancellation()
+        canCancelDownload = false; transferProgress = nil; message = "正在校验模型并启用…"
+        guard try QingTypeSettings.load() == original else { throw SettingsError.invalid("设置已被其他程序修改，请重开清言后重试。") }
+        let file = downloaded!.file
+        var model = try await Task.detached { try QingTypeContent.importGrammar(from: file, into: QingTypePaths.userDirectory) }.value
+        model.source = downloaded!.repository; model.release = downloaded!.release
+        var updated = original
+        updated.models.removeAll { $0.id == model.id }; updated.models.append(model); updated.activeModelID = model.id
+        let report = try await DeploymentService.apply(updated)
+        settings = updated; saved = updated; deployment = report
+        message = "万象模型已启用，之后输入可离线使用。"
+      } catch {
+        if Task.isCancelled || (error as? URLError)?.code == .cancelled { message = "已取消下载，当前输入设置保持不变。" }
+        else { failed = true; message = error.localizedDescription }
+      }
+    }
+  }
+
+  func selectInstalledIce() {
+    guard !busy, settings.rimeIce != nil else { return }
+    settings.schema = "rime_ice"; save()
+  }
+  func selectQingType() {
+    guard !busy, inputReady else { return }
+    Task {
+      do {
+        _ = try await InstallationService.command(["--select-input-source"])
+        message = try await InstallationService.state().selected ? "已选择清言，可以开始输入。" : "请从系统输入菜单选择清言。"
+        failed = false
+      } catch { failed = true; message = error.localizedDescription }
+    }
+  }
+  func openKeyboardSettings() { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!) }
+}
+
+struct WelcomePage: View {
+  @ObservedObject var model: SettingsModel
+  var body: some View {
+    VStack(alignment: .leading, spacing: 20) {
+      HStack(spacing: 18) {
+        Image(systemName: "character.bubble.fill").font(.system(size: 44)).foregroundStyle(.tint)
+        VStack(alignment: .leading, spacing: 5) {
+          Text("从一句“你好”开始").font(.title2.weight(.semibold))
+          Text("基础中文输入随应用提供，增强组件按需安装。")
+            .font(.callout).foregroundStyle(.secondary)
+        }
+      }.padding(.bottom, 2)
+      GroupBox("清言输入法") {
+        VStack(alignment: .leading, spacing: 12) {
+          Label(model.inputEnabled ? "已准备好中文输入" : "安装并启用基础中文输入", systemImage: model.inputEnabled ? "checkmark.circle.fill" : "keyboard")
+            .font(.headline)
+          Text("内置全拼与小鹤双拼。完成安装后，从系统输入菜单选择“清言”即可输入。")
+            .font(.callout).foregroundStyle(.secondary)
+          HStack {
+            if InstallationService.payload != nil || model.installedVersion != nil {
+              Button(installTitle, action: model.installInputMethod).buttonStyle(.borderedProminent)
+                .disabled(model.busy || model.loadFailed)
+            }
+            Button("打开键盘设置", action: model.openKeyboardSettings)
+            if let version = model.installedVersion { Text("已安装 \(version)").font(.caption).foregroundStyle(.secondary) }
+          }
+          if model.inputReady { Button("切换到清言", action: model.selectQingType).disabled(model.busy) }
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
+      }
+      VStack(alignment: .leading, spacing: 6) {
+        Text("按需添加").font(.headline)
+        Text("两项都可以跳过，之后随时回来安装。候选窗始终使用清言的原生界面。")
+          .font(.callout).foregroundStyle(.secondary)
+        if !model.inputReady { Text("请先安装或更新清言，再选择增强组件。").font(.caption).foregroundStyle(.secondary) }
+      }
+      GroupBox {
+        VStack(alignment: .leading, spacing: 12) {
+          Label("雾凇拼音", systemImage: "text.book.closed").font(.headline)
+          Text("增加雾凇词库、英文混输、拼写纠错及日期等扩展。")
+            .font(.callout).foregroundStyle(.secondary)
+          HStack {
+            if model.settings.rimeIce != nil {
+              Label("已安装", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.secondary)
+              if model.settings.schema != "rime_ice" { Button("使用雾凇拼音", action: model.selectInstalledIce) }
+              else { Text("正在使用").font(.callout).foregroundStyle(.secondary) }
+            } else {
+              Button("安装并使用雾凇") { model.installRimeIce(activate: true) }
+            }
+            Link("了解雾凇", destination: URL(string: "https://github.com/iDvel/rime-ice")!)
+          }.disabled(model.busy || !model.inputReady)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
+      }
+      WanxiangCard(model: model)
+      Text("下载组件需要网络；日常输入、个人词库和已安装的模型均在本机运行。")
+        .font(.caption).foregroundStyle(.secondary)
+    }.onAppear { model.refreshInstallation() }
+  }
+  private var installTitle: String {
+    guard let installed = model.installedVersion else { return "安装并启用清言" }
+    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+    return (version?.compare(installed, options: .numeric) == .orderedDescending) && InstallationService.payload != nil ? "更新输入法" : "重新检查并启用"
+  }
+}
+
+struct WanxiangCard: View {
+  @ObservedObject var model: SettingsModel
+  var body: some View {
+    GroupBox {
+      VStack(alignment: .leading, spacing: 12) {
+        Label("万象语言模型", systemImage: "brain").font(.headline)
+        Text("为拼音整句候选提供本地语言模型。按当前方案选择简体或繁体，下载约 400 MB。")
+          .font(.callout).foregroundStyle(.secondary)
+        HStack {
+          if let active = model.settings.activeModel {
+            Label("已启用：\(active.name)", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.secondary)
+          }
+          Button(model.settings.activeModel == nil ? "下载安装并启用万象" : "下载官方最新模型", action: model.downloadWanxiang)
+            .disabled(model.busy || !model.inputReady)
+        }
+        Link("模型来源与许可", destination: URL(string: "https://github.com/amzxyz/rime-wanxiang-data")!)
+          .font(.caption)
+      }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
+    }
+  }
+}

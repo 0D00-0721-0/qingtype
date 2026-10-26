@@ -6,11 +6,15 @@ and GPL-3.0 license are preserved in the source and `LICENSE.txt`.
 
 - **librime**: BSD-3-Clause; API headers are pinned through the `librime` submodule
   at `a251145d3aafa33871824a40bbec04c966bd8b56`. See `librime/LICENSE`.
-- **Local runtime and standard schemas**: the development build copies
-  `librime.1.dylib`, Rime plugins and SharedSupport data from the locally installed
-  Squirrel. CI extracts the public Squirrel 1.1.2 package without installing it.
-  Neither path publishes these binaries. Their version, plugin
-  licenses and data licenses must be recorded before producing a public release.
+- **Runtime and standard schemas**: local builds and CI extract the official
+  Squirrel 1.1.2 package without installing it. `dependencies/runtime.lock.json`
+  pins the source, byte count and SHA-256
+  `614746013212937623d5bbab9901e9c43d1ec937aa32307d6b6092a05e308287`.
+  The preview bundles librime, plugins and standard resources; legacy optional
+  `.gram` files are excluded. GPL, librime BSD, Yams MIT and Xiaohe license texts
+  are included. The full transitive binary/plugin/data permission audit remains a
+  requirement before public release. Explicit developer overrides are recorded
+  by `capture-baseline.py` and are not the default distribution source.
 - **Xiaohe double pinyin schema**: vendored from
   [rime/rime-double-pinyin](https://github.com/rime/rime-double-pinyin), commit
   `01a13287cbd27819be1c34fa1ddc1b3643d5001b`. Upstream BSD license is included as
@@ -18,8 +22,10 @@ and GPL-3.0 license are preserved in the source and `LICENSE.txt`.
 - **Sparkle**: not linked into QingType's command line development build. The
   original Squirrel project and submodule declaration remain for upstream history.
 
-The development build does not use Squirrel's update feed. No public updater,
-Developer ID signature, notarization or distribution pipeline is configured yet.
+The build does not use Squirrel's update feed. DMG preview packaging and optional
+Developer ID/notarization scripts exist; no valid identity was available locally,
+so signing with Developer ID and notarization have not been performed. There is
+no public app updater or published binary Release yet.
 
 - **Squirrel Panel**: package-manifest, schema-level grammar configuration and
   exclusive deployment lifecycle were informed by the local GPL-3.0 source of
@@ -30,10 +36,15 @@ Developer ID signature, notarization or distribution pipeline is configured yet.
   `0d9ee7ea8c4ebd4a489ad7a73d5c6cad55d6fed3` in `dependencies/Package.resolved`.
   Its license is bundled with both applications. See the upstream package for
   the included libyaml source and its copyright notices.
-- **Wanxiang model**: user-imported local data, not bundled with the application.
-  Source project: [amzxyz/RIME-LMDG](https://github.com/amzxyz/RIME-LMDG).
-  Imported files are copied and SHA-256 checked; the project does not redistribute
-  the user's existing model or dictionaries.
+- **Wanxiang model**: optional official download or local import, not bundled.
+  The former RIME-LMDG repository now resolves to
+  [amzxyz/rime-wanxiang-data](https://github.com/amzxyz/rime-wanxiang-data), whose
+  original data uses CC-BY-4.0; third-party components have their own notices.
+  The app uses the LTS release's SHA-256 and size, followed by grammar-header and
+  index checks. Source/release/checksum remain in model metadata. The simplified
+  model tested on 2026-10-27 had SHA-256
+  `e34500ab44626dc039a0641792ecba98ab63307646eb3d29186be56608ffe094`.
+  No user's existing model, word entries or learning databases are redistributed.
 
 - **Input-source cache diagnosis**: the macOS per-application keyboard cache
   repair was independently corroborated by

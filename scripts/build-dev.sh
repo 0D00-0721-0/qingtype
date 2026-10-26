@@ -2,12 +2,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Local development: reuse the user's installed Squirrel runtime and data.
-# This script never changes that installation or its user directory.
-runtime_app="${QINGTYPE_RUNTIME_APP:-$HOME/Library/Input Methods/Squirrel.app}"
+# Default runtime is extracted from a hash-pinned official archive, never installed.
+# QINGTYPE_RUNTIME_APP remains an explicit developer override.
+runtime_app="${QINGTYPE_RUNTIME_APP:-}"
+if [[ -z "$runtime_app" ]]; then
+  runtime_app=$(python3 scripts/fetch-runtime.py)
+fi
 runtime="$runtime_app/Contents"
 if [[ ! -f "$runtime/Frameworks/librime.1.dylib" ]]; then
-  echo "找不到 Rime 运行库，请设置 QINGTYPE_RUNTIME_APP 为鼠须管应用路径。" >&2
+  echo "找不到完整的 Rime 运行库，请重新获取依赖或检查 QINGTYPE_RUNTIME_APP。" >&2
   exit 1
 fi
 if [[ ! -f librime/src/rime_api.h ]]; then
@@ -16,14 +19,19 @@ fi
 
 app="$PWD/build/QingType.app"
 settings_app="$app/Contents/Applications/QingType Settings.app"
+rm -rf "$app/Contents/Frameworks" "$app/Contents/SharedSupport"
 mkdir -p "$app/Contents/"{MacOS,Resources,Frameworks,SharedSupport} "$settings_app/Contents/"{MacOS,Resources}
 ditto "$runtime/Frameworks/librime.1.dylib" "$app/Contents/Frameworks/librime.1.dylib"
 ditto "$runtime/Frameworks/rime-plugins" "$app/Contents/Frameworks/rime-plugins"
 ditto "$runtime/SharedSupport" "$app/Contents/SharedSupport"
+# Upstream also ships legacy optional grammar data. QingType starts without models.
+find "$app/Contents/SharedSupport" -type f -name '*.gram' -delete
 cp data/qingtype/double_pinyin_flypy.schema.yaml "$app/Contents/SharedSupport/"
 cp data/qingtype/qingtype_double_pinyin.schema.yaml "$app/Contents/SharedSupport/"
 cp LICENSE.txt "$app/Contents/Resources/"
 cp THIRD_PARTY.md "$app/Contents/Resources/"
+cp librime/LICENSE "$app/Contents/Resources/librime-LICENSE.txt"
+cp data/qingtype/LICENSE.double-pinyin "$app/Contents/Resources/Xiaohe-LICENSE.txt"
 python3 scripts/make-bundles.py "$app" "$settings_app"
 
 swift build --package-path dependencies -c release
@@ -31,8 +39,10 @@ yaml_build_dir=$(swift build --package-path dependencies -c release --show-bin-p
 install -m 644 dependencies/.build/checkouts/Yams/LICENSE "$app/Contents/Resources/Yams-LICENSE.txt"
 install -m 644 dependencies/.build/checkouts/Yams/LICENSE "$settings_app/Contents/Resources/Yams-LICENSE.txt"
 yaml_flags=(-I "$yaml_build_dir" -I "$yaml_build_dir/Modules" -I dependencies/.build/checkouts/Yams/Sources/CYaml/include -L "$yaml_build_dir" -lQingTypeYAML)
+compile_target="$(uname -m)-apple-macos14.0"
 echo "编译清言输入法…"
 swiftc -parse-as-library -swift-version 5 -enable-bare-slash-regex -module-name QingType \
+  -target "$compile_target" \
   -I librime/src -I librime/include -import-objc-header sources/Squirrel-Bridging-Header.h \
   sources/*.swift shared/*.swift "${yaml_flags[@]}" \
   -L "$app/Contents/Frameworks" -lrime.1 \
@@ -42,6 +52,7 @@ swiftc -parse-as-library -swift-version 5 -enable-bare-slash-regex -module-name 
 
 echo "编译清言设置…"
 swiftc -parse-as-library -swift-version 5 -module-name QingTypeSettings \
+  -target "$compile_target" \
   settings/*.swift shared/*.swift "${yaml_flags[@]}" -framework SwiftUI -framework AppKit \
   -o "$settings_app/Contents/MacOS/QingTypeSettings"
 

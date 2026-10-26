@@ -47,7 +47,14 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate {
   }
 
   func openSettings() {
-    let settings = Bundle.main.bundleURL.appendingPathComponent("Contents/Applications/QingType Settings.app")
+    let fallback = Bundle.main.bundleURL.appendingPathComponent("Contents/Applications/QingType Settings.app")
+    let candidates = [FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/清言.app"), URL(fileURLWithPath: "/Applications/清言.app")]
+    let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+    let settings = candidates.first {
+      guard let bundle = Bundle(url: $0), bundle.bundleIdentifier == "org.qingtype.app",
+            let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else { return false }
+      return version.compare(current, options: .numeric) != .orderedAscending
+    } ?? fallback
     NSWorkspace.shared.openApplication(at: settings, configuration: .init()) { _, error in
       if let error { NSLog("Cannot open settings: \(error)") }
     }

@@ -8,55 +8,14 @@ struct RimeIceDownload {
 }
 
 enum QingTypeRimeIceDownload {
-  private struct Release: Decodable {
-    var tag_name: String
-    var assets: [Asset]
-    struct Asset: Decodable {
-      var name: String
-      var browser_download_url: URL
-      var size: Int
-      var digest: String?
-    }
-  }
-
-  static func official() async throws -> RimeIceDownload {
-    let configuration = URLSessionConfiguration.ephemeral
-    configuration.timeoutIntervalForRequest = 60
-    configuration.timeoutIntervalForResource = 300
-    let session = URLSession(configuration: configuration)
-    defer { session.invalidateAndCancel() }
-    var request = URLRequest(url: URL(string: "https://api.github.com/repos/iDvel/rime-ice/releases/latest")!)
-    request.setValue("QingType", forHTTPHeaderField: "User-Agent")
-    request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-    let (metadata, response) = try await session.data(for: request)
-    guard (response as? HTTPURLResponse)?.statusCode == 200, metadata.count < 2 * 1024 * 1024 else {
-      throw SettingsError.invalid("无法读取雾凇官方发行信息。可稍后重试，或从完整方案文件夹导入。")
-    }
-    let release = try JSONDecoder().decode(Release.self, from: metadata)
-    guard let asset = release.assets.first(where: { $0.name == "full.zip" }),
-          asset.size > 0, asset.size <= 128 * 1024 * 1024,
-          asset.browser_download_url.scheme == "https", asset.browser_download_url.host == "github.com",
-          asset.browser_download_url.path.hasPrefix("/iDvel/rime-ice/releases/download/"),
-          let digest = asset.digest, digest.range(of: "^sha256:[a-f0-9]{64}$", options: .regularExpression) != nil else {
-      throw SettingsError.invalid("官方完整包缺少可校验的 SHA-256，或发行格式已变化，请更新清言。")
-    }
-    let (temporary, downloadResponse) = try await session.download(from: asset.browser_download_url)
-    defer { try? FileManager.default.removeItem(at: temporary) }
-    guard (downloadResponse as? HTTPURLResponse)?.statusCode == 200,
-          try temporary.resourceValues(forKeys: [.fileSizeKey]).fileSize == asset.size,
-          try QingTypeContent.digest(of: temporary) == String(digest.dropFirst(7)) else {
-      throw SettingsError.invalid("下载的雾凇方案与官方大小或 SHA-256 不符，已停止安装。")
-    }
-    let directory = FileManager.default.temporaryDirectory.appendingPathComponent("qingtype-ice-download-\(UUID())")
+  static func official(progress: @escaping @Sendable (QingTypeTransferProgress) -> Void = { _ in }) async throws -> RimeIceDownload {
+    let downloaded = try await QingTypeDownloads.download(repository: "iDvel/rime-ice", tag: "latest", filename: "full.zip", limit: 128 * 1024 * 1024, progress: progress)
     do {
-      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-      let zip = directory.appendingPathComponent("full.zip")
-      try FileManager.default.moveItem(at: temporary, to: zip)
-      let root = try extract(zip, to: directory.appendingPathComponent("package"))
-      return RimeIceDownload(directory: directory, root: root,
-        provenance: "iDvel/rime-ice · \(release.tag_name)", sha256: String(digest.dropFirst(7)))
+      let root = try extract(downloaded.file, to: downloaded.directory.appendingPathComponent("package"))
+      return RimeIceDownload(directory: downloaded.directory, root: root,
+        provenance: "iDvel/rime-ice · \(downloaded.release)", sha256: downloaded.sha256)
     } catch {
-      try? FileManager.default.removeItem(at: directory)
+      try? FileManager.default.removeItem(at: downloaded.directory)
       throw error
     }
   }

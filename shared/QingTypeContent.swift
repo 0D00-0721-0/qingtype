@@ -18,6 +18,8 @@ struct GrammarAsset: Codable, Equatable, Identifiable {
   var byteCount: Int64
   var sha256: String
   var variant: String?
+  var source: String?
+  var release: String?
   var importedAt = Date()
 }
 

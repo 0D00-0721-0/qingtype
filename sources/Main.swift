@@ -23,6 +23,9 @@ struct SquirrelApp {
       if CommandLine.arguments.contains("--engine-smoke-test") {
         return QingTypeDiagnostics.runEngineTest(api: rimeAPI)
       }
+      if CommandLine.arguments.contains("--factory-engine-test") {
+        return QingTypeSetupDiagnostics.run(api: rimeAPI)
+      }
       if CommandLine.arguments.contains("--candidate-ui-test") {
         return QingTypeDiagnostics.runCandidateTests()
       }

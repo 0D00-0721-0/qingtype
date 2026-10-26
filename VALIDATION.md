@@ -1,8 +1,50 @@
-# Local validation — 2026-10-27 — QingType 0.3.1
+# Local validation — 2026-10-27 — QingType 0.4.0
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
+
+## Installable preview and optional components — 0.4.0
+
+The normal QingType app now opens a native welcome page, installs/enables the
+bundled input service, and offers independent opt-in Rime Ice and Wanxiang
+installation. First launch does not download either. Model selection follows the
+saved simplified/traditional schema. Transfers have progress/cancellation and
+official SHA-256/size checks; activation still uses configuration recovery and
+verified grammar loading. The existing candidate window is retained.
+
+The default build extracts a hash-pinned Squirrel 1.1.2 archive without relying
+on a locally installed Squirrel. Legacy optional .gram files are stripped. Both
+executables target macOS 14.0, verified in Mach-O headers. The normal app has its
+own bundle ID and packages the input service, libraries and base resources.
+
+186 local checks passed: the prior 160, 20 setup/catalog/install rollback/native
+cache checks, and six offline factory engine checks. Package inspection verifies
+absence of optional models, Ice and personal data, default resources, portable
+DMG checksum, actual minimum OS and library paths. The read-only DMG is mounted,
+its nested signing structure verified, and its payload passes the factory engine
+test. This does not prove Developer ID/Gatekeeper distribution acceptance.
+
+All four component combinations were tested: neither (factory), Ice only, model
+only (8 factory/model checks), and Ice plus model (17 Ice engine checks). The model
+was downloaded by the native official downloader, SHA-256 checked and executed
+by the real engine; its load is visible in plugin output. Transfer cancellation
+was also tested. Optional-download tests use temporary/reference data, not new
+models activated in the user's existing profile.
+
+A harness using the same native InstallationService upgraded the local input
+service to 0.4.0, verified source enablement, deployment and existing model load,
+and confirmed all settings values were preserved. This is a backend invocation,
+not a successful graphical click-through. New window inspection remains blocked
+by a locked Mac; actual keyboard acceptance is deferred as requested.
+
+Local evidence: build/setup-tests.log, distribution-tests.log,
+native-install-040.log, factory-wanxiang-test.log, setup-ice-wanxiang-test.log,
+wanxiang-download.log and wanxiang-download-cancel.log. The new CI runs bootstrap,
+the full suite and DMG packaging/inspection; its result must be checked at the
+pushed source revision. No valid local signing identity exists (0 identities),
+so Developer ID/notarization branches are prepared but unexecuted. No public
+binary release or clean-Mac GUI/install/uninstall acceptance is claimed.
 
 ## Rime Ice integration — 0.3.1 (2026-10-27)
 

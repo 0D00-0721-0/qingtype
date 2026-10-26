@@ -30,7 +30,10 @@ parser.add_argument("--output", type=Path, default=ROOT / "build/baseline.json")
 args = parser.parse_args()
 app = args.app.resolve()
 status = json.loads(command(str(app / "Contents/MacOS/QingType"), "--status"))
-runtime = Path(os.environ.get("QINGTYPE_RUNTIME_APP", str(Path.home() / "Library/Input Methods/Squirrel.app")))
+runtime_lock = json.loads((ROOT / 'dependencies/runtime.lock.json').read_text())
+runtime_override = os.environ.get('QINGTYPE_RUNTIME_APP')
+cached_runtime = list((ROOT / 'build/runtime' / runtime_lock['version'] / 'expanded').rglob('Squirrel.app'))
+runtime = Path(runtime_override) if runtime_override else (cached_runtime[0] if cached_runtime else ROOT / 'build/runtime/not-extracted')
 runtime_info = plistlib.loads((runtime / "Contents/Info.plist").read_bytes()) if runtime.exists() else {}
 settings_path = Path.home() / "Library/QingType/settings.json"
 settings = json.loads(settings_path.read_text()) if settings_path.exists() else {}
@@ -42,6 +45,7 @@ report = {
                   "macOS": command("sw_vers"), "architecture": command("uname", "-m")},
     "application": status,
     "runtime": {"SquirrelVersion": runtime_info.get("CFBundleShortVersionString", runtime_info.get("CFBundleVersion")),
+                "archive": runtime_lock, "explicitOverride": bool(runtime_override),
                 "headersCommit": command("git", "-C", "librime", "rev-parse", "HEAD"),
                 "binaries": {str(p.relative_to(app)): sha256(p) for p in sorted((app / "Contents/Frameworks").rglob("*.dylib"))}},
     "Yams": json.loads((ROOT / "dependencies/Package.resolved").read_text()),

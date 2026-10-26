@@ -18,7 +18,7 @@ struct QingTypeSettingsApp: App {
 @MainActor
 final class SettingsModel: ObservableObject {
   @Published var sampleText = ""
-  @Published var section: SettingsSection? = .appearance
+  @Published var section: SettingsSection? = .welcome
   @Published var settings = QingTypeSettings()
   @Published var saved = QingTypeSettings()
   @Published var message: String?
@@ -26,6 +26,11 @@ final class SettingsModel: ObservableObject {
   @Published var loadFailed = false
   @Published var busy = false
   @Published var deployment: QingTypeDeploymentReport?
+  @Published var installedVersion: String?
+  @Published var inputEnabled = false
+  @Published var transferProgress: QingTypeTransferProgress?
+  @Published var canCancelDownload = false
+  var componentTask: Task<Void, Never>?
 
 
   init() {
@@ -36,9 +41,14 @@ final class SettingsModel: ObservableObject {
       }
     }
     catch { loadFailed = true; failed = true; message = "无法读取设置：\(error.localizedDescription)" }
+    refreshInstallation()
   }
 
   var isDirty: Bool { settings != saved }
+  var inputReady: Bool {
+    guard inputEnabled, let installedVersion, let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else { return false }
+    return installedVersion.compare(current, options: .numeric) != .orderedAscending
+  }
   var deploymentIsCurrent: Bool {
     guard let deployment, !isDirty else { return false }
     return (try? QingTypeContent.digest(of: QingTypePaths.userDirectory.appendingPathComponent("settings.json"))) == deployment.settingsHash
@@ -132,10 +142,11 @@ final class SettingsModel: ObservableObject {
 }
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-  case input = "输入", appearance = "外观", personal = "个人词库", dictionaries = "导入词库", models = "语言模型", phrases = "快捷短语", about = "关于与安装"
+  case welcome = "开始使用", input = "输入", appearance = "外观", personal = "个人词库", dictionaries = "导入词库", models = "语言模型", phrases = "快捷短语", about = "关于与安装"
   var id: String { rawValue }
   var icon: String {
     switch self {
+    case .welcome: return "hand.wave"
     case .input: return "keyboard"
     case .appearance: return "textformat.size"
     case .personal: return "text.book.closed"
@@ -162,7 +173,7 @@ struct SettingsView: View {
           Image(systemName: "character.bubble.fill").font(.title2).foregroundStyle(.tint)
           VStack(alignment: .leading, spacing: 3) {
             Text("清言").font(.headline)
-            Text("QingType · 开发版").font(.caption).foregroundStyle(.secondary)
+            Text("QingType").font(.caption).foregroundStyle(.secondary)
           }
           Spacer()
         }.padding(16)
@@ -176,18 +187,29 @@ struct SettingsView: View {
               Text(subtitle).foregroundStyle(.secondary)
             }
             .padding(.top, 6)
-            switch section ?? .input {
-            case .input: inputPage
-            case .appearance: appearancePage
-            case .personal: PersonalDictionaryPage(model: model)
-            case .dictionaries: dictionariesPage
-            case .models: modelsPage
-            case .phrases: phrasesPage
-            case .about: aboutPage
-            }
+            Group {
+              switch section ?? .input {
+              case .welcome: WelcomePage(model: model)
+              case .input: inputPage
+              case .appearance: appearancePage
+              case .personal: PersonalDictionaryPage(model: model)
+              case .dictionaries: dictionariesPage
+              case .models: modelsPage
+              case .phrases: phrasesPage
+              case .about: aboutPage
+              }
+            }.disabled(section != .welcome && section != .about && (!model.inputReady || model.busy))
           }.padding(28).frame(maxWidth: 780, alignment: .leading)
         }
         Divider()
+        if let progress = model.transferProgress, model.canCancelDownload {
+          HStack {
+            ProgressView(value: progress.fraction)
+            Text("\(ByteCountFormatter.string(fromByteCount: progress.received, countStyle: .file)) / \(ByteCountFormatter.string(fromByteCount: progress.total, countStyle: .file))")
+              .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            Button("取消下载") { model.componentTask?.cancel() }
+          }.padding(.horizontal, 16).padding(.top, 10)
+        }
         HStack {
           if model.busy { ProgressView().controlSize(.small) }
           if model.isDirty && !model.failed && !model.busy {
@@ -203,7 +225,7 @@ struct SettingsView: View {
           Spacer(minLength: 12)
           Button("保存并应用", action: model.save)
             .buttonStyle(.borderedProminent).keyboardShortcut("s", modifiers: .command)
-            .disabled(model.loadFailed || model.busy)
+            .disabled(model.loadFailed || model.busy || !model.inputReady)
         }.padding(16)
       }
       .background(Color(nsColor: .windowBackgroundColor))
@@ -213,6 +235,7 @@ struct SettingsView: View {
 
   private var subtitle: String {
     switch section ?? .input {
+    case .welcome: return "先开始输入，再选择适合自己的增强组件。"
     case .input: return "选好输入习惯，安心写下每一句。"
     case .appearance: return "候选窗随系统明暗模式与高亮颜色变化。"
     case .personal: return "管理词语、拼音和词频，保存后参与日常输入。"
@@ -312,6 +335,7 @@ struct SettingsView: View {
 
   private var modelsPage: some View {
     VStack(alignment: .leading, spacing: 18) {
+      WanxiangCard(model: model)
       GroupBox("语言模型") {
         VStack(alignment: .leading, spacing: 14) {
           Picker("当前模型", selection: Binding(
@@ -391,7 +415,7 @@ struct SettingsView: View {
         Image(systemName: "character.bubble.fill").font(.system(size: 44)).foregroundStyle(.tint)
         VStack(alignment: .leading, spacing: 5) {
           Text("清言输入法").font(.title2.bold())
-          Text("\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "版本未知") · 本地开发版")
+          Text("\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "版本未知")")
             .foregroundStyle(.secondary)
         }
       }
@@ -401,7 +425,7 @@ struct SettingsView: View {
                 systemImage: model.installed ? "checkmark.circle.fill" : "circle.dashed")
           Text(model.installed
             ? "打开系统设置，在“键盘 → 文本输入 → 编辑”中添加“清言”。如果没有出现，请注销后重新登录。"
-            : "请先运行项目中的安装脚本，然后到系统设置添加“清言”。")
+            : "前往“开始使用”，点击“安装并启用清言”。")
             .font(.callout).foregroundStyle(.secondary)
           Button("打开键盘设置") {
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)

@@ -1,19 +1,24 @@
 # 清言输入法 · QingType
 
 基于 Rime 与鼠须管的开源 macOS 输入法。目标是用 Mac 原生界面完成日常输入、
-自定义词库添加及万象等本地语言模型管理。当前为 **0.3.1 开发原型**，GPL-3.0。
+自定义词库添加及万象等本地语言模型管理。当前为 **0.4.0 可安装预览版**，GPL-3.0。
 
 ## 使用
 
-打开已安装输入法内的“清言设置”，在系统输入菜单选择清言。
-也可以使用系统的输入源切换快捷键。
+打开 DMG，将「清言.app」拖入「Applications」，再打开清言。
+在「开始使用」点击「安装并启用清言」，完成后点击「切换到清言」或使用系统输入菜单。
+基础全拼和小鹤双拼随应用提供，不需要预装鼠须管，也不需要先下载雾凇或模型。
+雾凇完整方案、万象语言模型均可跳过，之后在软件中主动下载安装；下载有进度和取消入口。
+当前测试包采用临时签名；正式公开发行仍待 Developer ID 签名、公证与干净 Mac 验收。
+[安装、选装与打包说明](docs/INSTALLATION.md)。
+
 0.2.1 包含 QQ 切换输入源时崩溃的缓存修复与候选展开重写。
 0.2.2 更正输入法连接命名并避免重复服务争用端点；用户已确认完整重启 Safari 后可以切换。
 更新涉及连接配置时，请用 ⌘Q 完整退出并重新打开浏览器。
 
 - **输入**：全拼简体、全拼繁体、小鹤双拼简体；候选数量、Shift 切换及试打。
-- **雾凇拼音**：在「输入」页下载官方完整方案，或从完整方案文件夹导入；
-  安装后选择雾凇并保存应用。保留个人词库、快捷短语和简体语言模型。
+- **雾凇拼音**：「开始使用」可下载安装并启用；「输入」页也保留只安装和本地文件夹导入。
+  保留个人词库、快捷短语和简体语言模型。
   [安装与数据保护](docs/RIME_ICE.md)。
 - **外观**：单行、右侧箭头与展开网格使用同一个非激活 AppKit 窗口；
   支持横排／竖排与字号。展开态按原生参考调整为小编号、对齐的文字、浅灰背景，
@@ -23,8 +28,8 @@
   [使用格式与验收](docs/PERSONAL_DICTIONARY.md)。
 - **导入词库**：导入 `.dict.yaml`，支持同一文件夹内通过 `import_tables` 引用的依赖。
   选中要启用的词库，再点“保存并应用”。
-- **语言模型**：导入 Rime `.gram`，或从已有 Rime 数据目录复制万象模型。
-  选择模型后“保存并应用”，界面会显示实际的编译与模型加载结果。
+- **语言模型**：从「开始使用」或「语言模型」页下载官方万象模型并启用，按当前方案选择简体或繁体。
+  也保留本地 `.gram` 导入。界面显示实际的编译与模型加载结果。
 - **快捷短语**：编辑字母编码和短语；独立于固定词库与语言模型。
 
 清言数据位于 `~/Library/QingType`。模型、词库均复制到清言自己的目录，源文件不作修改。
@@ -55,14 +60,16 @@
 ```sh
 ./scripts/build-dev.sh
 ./scripts/test.sh
-open "build/QingType.app/Contents/Applications/QingType Settings.app"
+./scripts/package-app.sh
+open "build/distribution/清言.app"
 ```
 
-构建使用 `swiftc`、macOS SDK 和固定版本的 Yams。默认从
-`~/Library/Input Methods/Squirrel.app` 复制本机 Rime 运行库、插件和基础方案；
-可设置 `QINGTYPE_RUNTIME_APP` 指向另一份鼠须管。
+构建使用 `swiftc`、macOS SDK 和固定版本的 Yams。默认从 `dependencies/runtime.lock.json`
+指定的官方 Squirrel 1.1.2 包获取运行库，校验大小和 SHA-256 后解包到被忽略的 `build/runtime`，
+不会安装鼠须管，不读取其用户配置。`QINGTYPE_RUNTIME_APP` 仅用于显式开发覆盖。
 需要 macOS SDK 和 Swift 工具链，可使用 Xcode 或 Command Line Tools。
-输出为 `build/QingType.app`，内含原生 SwiftUI 设置应用。
+构建目标为 macOS 14.0；输出 `build/QingType.app` 输入服务和原生设置，打包生成
+`build/distribution/清言.app` 与 `QingType-0.4.0-<架构>.dmg`，包内没有可选模型和个人数据。
 
 ```sh
 ./scripts/install-dev.sh
@@ -83,7 +90,7 @@ open "build/QingType.app/Contents/Applications/QingType Settings.app"
 
 仍需完成浏览器、微信、Word、VS Code、终端、多显示器和长时间使用测试，
 继续打磨候选窗与苹果拼音的交互差异，并完成词库移除／导出、在线更新、
-独立可复现的 Rime 依赖构建以及正式发行签名与公证。
+第三方分发授权完整审计以及正式发行签名与公证。
 
-当前产物采用本地临时签名，未配置公开发行与更新流程。上游工程和工作流保留供参考；
+当前产物采用本地临时签名，已提供 Developer ID 重签与公证脚本，但本机无有效签名身份，未执行正式签名/公证，也未发布公开 Release。应用自动更新尚未实现。上游工程和工作流保留供参考；
 开发请使用当前 `scripts/` 脚本。来源见 `THIRD_PARTY.md`，原始说明见 `README.upstream.md`。

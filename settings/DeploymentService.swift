@@ -9,7 +9,7 @@ enum DeploymentService {
   }
 
   @MainActor
-  static func installRimeIce(from source: URL, saved: QingTypeSettings, provenance: String, sha256: String?) async throws -> (QingTypeSettings, QingTypeDeploymentReport) {
+  static func installRimeIce(from source: URL, saved: QingTypeSettings, provenance: String, sha256: String?, activate: Bool = false) async throws -> (QingTypeSettings, QingTypeDeploymentReport) {
     let directory = QingTypePaths.userDirectory
     guard try QingTypeSettings.load() == saved else { throw SettingsError.invalid("设置文件已被其他程序修改，请重开设置后再安装。") }
     let running = NSRunningApplication.runningApplications(withBundleIdentifier: "org.qingtype.inputmethod.QingType")
@@ -37,6 +37,7 @@ enum DeploymentService {
     }
     var updated = saved
     updated.rimeIce = installation.asset
+    if activate { updated.schema = "rime_ice" }
     do {
       let report = try await QingTypeConfigurationApply.apply(updated, to: directory) {
         try await runWorker(appURL: inputMethodURL())
@@ -89,7 +90,7 @@ enum DeploymentService {
     }
   }
 
-  private static func runWorker(appURL: URL) async throws -> QingTypeDeploymentReport {
+  static func runWorker(appURL: URL) async throws -> QingTypeDeploymentReport {
     let result = try await Task.detached {
       let task = Process()
       task.executableURL = appURL.appendingPathComponent("Contents/MacOS/QingType")
