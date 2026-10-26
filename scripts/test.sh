@@ -2,7 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build
-yaml_flags=(-I dependencies/.build/release -I dependencies/.build/checkouts/Yams/Sources/CYaml/include -L dependencies/.build/release -lQingTypeYAML)
+yaml_build_dir=$(swift build --package-path dependencies -c release --show-bin-path)
+yaml_flags=(-I "$yaml_build_dir" -I "$yaml_build_dir/Modules" -I dependencies/.build/checkouts/Yams/Sources/CYaml/include -L "$yaml_build_dir" -lQingTypeYAML)
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/SettingsSafetyTests.swift "${yaml_flags[@]}" -o build/settings-tests
 build/settings-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/ContentTests.swift "${yaml_flags[@]}" -o build/content-tests
