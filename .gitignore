@@ -19,3 +19,12 @@ package/*.xml
 *~
 .*.swp
 .DS_Store
+
+dependencies/.build/
+dependencies/.swiftpm/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*.gram
+*.userdb/

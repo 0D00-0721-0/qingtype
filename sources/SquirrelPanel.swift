@@ -10,7 +10,7 @@ import AppKit
 final class SquirrelPanel: NSPanel {
   private let view: SquirrelView
   private let back: NSVisualEffectView
-  var inputController: SquirrelInputController?
+  var inputController: QingTypeInputController?
 
   var position: NSRect
   private var screenRect: NSRect = .zero
@@ -43,7 +43,7 @@ final class SquirrelPanel: NSPanel {
     self.isOpaque = false
     self.backgroundColor = .clear
     back.blendingMode = .behindWindow
-    back.material = .hudWindow
+    back.material = .popover
     back.state = .active
     back.wantsLayer = true
     back.layer?.mask = view.shape

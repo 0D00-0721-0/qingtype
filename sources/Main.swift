@@ -10,15 +10,9 @@ import InputMethodKit
 
 @main
 struct SquirrelApp {
-  static let userDir = if let pwuid = getpwuid(getuid()) {
-    URL(fileURLWithFileSystemRepresentation: pwuid.pointee.pw_dir, isDirectory: true, relativeTo: nil).appending(components: "Library", "Rime")
-  } else {
-    try! FileManager.default.url(for: .libraryDirectory, in: .userDomainMask, appropriateFor: nil, create: false).appendingPathComponent("Rime", isDirectory: true)
-  }
-  static let appDir = "/Library/Input Library/Squirrel.app".withCString { dir in
-    URL(fileURLWithFileSystemRepresentation: dir, isDirectory: false, relativeTo: nil)
-  }
-  static let logDir = FileManager.default.temporaryDirectory.appending(component: "rime.squirrel", directoryHint: .isDirectory)
+  static let userDir = QingTypePaths.userDirectory
+  static let appDir = Bundle.main.bundleURL
+  static let logDir = FileManager.default.temporaryDirectory.appendingPathComponent("rime.qingtype", isDirectory: true)
 
   // swiftlint:disable:next cyclomatic_complexity
   static func main() {
@@ -26,16 +20,83 @@ struct SquirrelApp {
 
     let handled = autoreleasepool {
       let installer = SquirrelInstaller()
+      if CommandLine.arguments.contains("--engine-smoke-test") {
+        return QingTypeDiagnostics.runEngineTest(api: rimeAPI)
+      }
+      if CommandLine.arguments.contains("--candidate-ui-test") {
+        return QingTypeDiagnostics.runCandidateTests()
+      }
+      if CommandLine.arguments.contains("--preview-system") {
+        QingTypeDiagnostics.showSystemPreview()
+        return true
+      }
+      if CommandLine.arguments.contains("--preview-expanded") {
+        QingTypeDiagnostics.showExpandedPreview()
+        return true
+      }
+      if CommandLine.arguments.contains("--deploy-user-data") {
+        do {
+          let running = NSRunningApplication.runningApplications(withBundleIdentifier: "org.qingtype.inputmethod.QingType")
+            .filter { $0.processIdentifier != getpid() }
+          guard running.isEmpty else {
+            throw SettingsError.invalid("清言输入法正在运行。请在清言设置中使用“保存并应用”，以便安全退出并重新部署。")
+          }
+          let report = try QingTypeMaintenance.deploy(api: rimeAPI)
+          let data = try JSONEncoder().encode(report)
+          print(String(decoding: data, as: UTF8.self))
+          if !report.success { exit(1) }
+        } catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
+        return true
+      }
+      if CommandLine.arguments.count > 2 && ["--import-dictionary", "--import-model"].contains(CommandLine.arguments[1]) {
+        do {
+          var settings = try QingTypeSettings.load()
+          let source = URL(fileURLWithPath: CommandLine.arguments[2])
+          if CommandLine.arguments[1] == "--import-model" {
+            let model = try QingTypeContent.importGrammar(from: source, into: userDir)
+            if !settings.models.contains(where: { $0.id == model.id }) { settings.models.append(model) }
+            settings.activeModelID = model.id
+          } else {
+            settings.dictionaries.append(try QingTypeContent.importDictionary(from: source, into: userDir))
+          }
+          try settings.save()
+          print("导入完成，请重新部署以应用。")
+        } catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
+        return true
+      }
+      if CommandLine.arguments.contains("--preview") {
+        QingTypeDiagnostics.showPreview()
+        return true
+      }
       let args = CommandLine.arguments
       if args.count > 1 {
         switch args[1] {
+        case "--status":
+          let report: [String: Any] = [
+            "bundle": Bundle.main.bundleIdentifier ?? "", "userDirectory": userDir.path,
+            "controllerClassFound": NSClassFromString("QingType.QingTypeInputController") != nil,
+            "inputSources": installer.status()
+          ]
+          if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+            print(String(decoding: data, as: UTF8.self))
+          }
+          return true
         case "--quit":
           let bundleId = Bundle.main.bundleIdentifier!
           let runningSquirrels = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+            .filter { $0.processIdentifier != getpid() }
           runningSquirrels.forEach { $0.terminate() }
+          let deadline = Date().addingTimeInterval(5)
+          while runningSquirrels.contains(where: { !$0.isTerminated }), Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+          }
+          if runningSquirrels.contains(where: { !$0.isTerminated }) {
+            fputs("清言尚未退出，停止替换程序。\n", stderr)
+            exit(1)
+          }
           return true
         case "--reload":
-          DistributedNotificationCenter.default().postNotificationName(.init("SquirrelReloadNotification"), object: nil)
+          DistributedNotificationCenter.default().postNotificationName(.init("QingTypeReloadNotification"), object: nil)
           return true
         case "--register-input-source", "--install":
           installer.register()
@@ -72,13 +133,13 @@ struct SquirrelApp {
           SquirrelApplicationDelegate.showMessage(msgText: NSLocalizedString("deploy_update", comment: ""))
           // Build all schemas in current directory
           var builderTraits = RimeTraits.rimeStructInit()
-          builderTraits.setCString("rime.squirrel-builder", to: \.app_name)
+          builderTraits.setCString("rime.qingtype-builder", to: \.app_name)
           rimeAPI.setup(&builderTraits)
           rimeAPI.deployer_initialize(nil)
           _ = rimeAPI.deploy()
           return true
         case "--sync":
-          DistributedNotificationCenter.default().postNotificationName(.init("SquirrelSyncNotification"), object: nil)
+          DistributedNotificationCenter.default().postNotificationName(.init("QingTypeSyncNotification"), object: nil)
           return true
         case "--help":
           print(helpDoc)
@@ -97,7 +158,7 @@ struct SquirrelApp {
       // find the bundle identifier and then initialize the input method server
       let main = Bundle.main
       let connectionName = main.object(forInfoDictionaryKey: "InputMethodConnectionName") as! String
-      _ = IMKServer(name: connectionName, bundleIdentifier: main.bundleIdentifier!)
+      let server = IMKServer(name: connectionName, bundleIdentifier: main.bundleIdentifier!)
       // load the bundle explicitly because in this case the input method is a
       // background only application
       let app = NSApplication.shared
@@ -118,15 +179,17 @@ struct SquirrelApp {
         task.arguments = args
         try? task.run()
       } else {
+        do { try QingTypeSettings.ensureInitialConfiguration() }
+        catch { NSLog("Cannot prepare QingType settings: \(error)") }
         NSApp.squirrelAppDelegate.setupRime()
         NSApp.squirrelAppDelegate.startRime(fullCheck: false)
         NSApp.squirrelAppDelegate.loadSettings()
-        print("Squirrel reporting!")
+        print("QingType reporting!")
       }
 
       // finally run everything
-      app.run()
-      print("Squirrel is quitting...")
+      withExtendedLifetime(server) { app.run() }
+      print("QingType is quitting...")
       rimeAPI.finalize()
     }
     return
@@ -135,11 +198,14 @@ struct SquirrelApp {
   static let helpDoc = """
 Supported arguments:
 Perform actions:
-  --quit                     quit all Squirrel process
+  --quit                     quit all QingType processes
   --reload                   deploy
   --sync                     sync user data
+  --status                   report registration and runtime class status
   --build                    build all schemas in current directory
-Install Squirrel:
+  --engine-smoke-test        test Rime in an isolated temporary directory
+  --preview [--capture path] show the actual candidate panel
+Install QingType:
   --install, --register-input-source    register input source
   --enable-input-source [source id...]  input source list optional
   --disable-input-source [source id...] input source list optional

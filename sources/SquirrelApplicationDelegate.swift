@@ -5,53 +5,15 @@
 //  Created by Leo Liu on 5/6/24.
 //
 
-import UserNotifications
-import Sparkle
 import AppKit
 
-final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate, SPUStandardUserDriverDelegate, UNUserNotificationCenterDelegate {
+final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate {
   static let rimeWikiURL = URL(string: "https://github.com/rime/home/wiki")!
-  static let updateNotificationIdentifier = "SquirrelUpdateNotification"
-  static let notificationIdentifier = "SquirrelNotification"
 
   let rimeAPI: RimeApi_stdbool = rime_get_api_stdbool().pointee
   var config: SquirrelConfig?
   var panel: SquirrelPanel?
   var enableNotifications = false
-  let updateController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
-  var supportsGentleScheduledUpdateReminders: Bool {
-    true
-  }
-
-  func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool, forUpdate update: SUAppcastItem, state: SPUUserUpdateState) {
-    NSApp.setActivationPolicy(.regular)
-    if !state.userInitiated {
-      NSApp.dockTile.badgeLabel = "1"
-      let content = UNMutableNotificationContent()
-      content.title = NSLocalizedString("A new update is available", comment: "Update")
-      content.body = NSLocalizedString("Version [version] is now available", comment: "Update").replacingOccurrences(of: "[version]", with: update.displayVersionString)
-      let request = UNNotificationRequest(identifier: Self.updateNotificationIdentifier, content: content, trigger: nil)
-      UNUserNotificationCenter.current().add(request)
-    }
-  }
-
-  func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
-    NSApp.dockTile.badgeLabel = ""
-    UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [Self.updateNotificationIdentifier])
-  }
-
-  func standardUserDriverWillFinishUpdateSession() {
-    NSApp.setActivationPolicy(.accessory)
-  }
-
-  func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-    if response.notification.request.identifier == Self.updateNotificationIdentifier && response.actionIdentifier == UNNotificationDefaultActionIdentifier {
-      updateController.updater.checkForUpdates()
-    }
-
-    completionHandler()
-  }
-
   func applicationWillFinishLaunching(_ notification: Notification) {
     panel = SquirrelPanel(position: .zero)
     addObservers()
@@ -84,12 +46,10 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate, SPUSta
     NSWorkspace.shared.open(SquirrelApp.userDir)
   }
 
-  func checkForUpdates() {
-    if updateController.updater.canCheckForUpdates {
-      print("Checking for updates")
-      updateController.updater.checkForUpdates()
-    } else {
-      print("Cannot check for updates")
+  func openSettings() {
+    let settings = Bundle.main.bundleURL.appendingPathComponent("Contents/Applications/QingType Settings.app")
+    NSWorkspace.shared.openApplication(at: settings, configuration: .init()) { _, error in
+      if let error { NSLog("Cannot open settings: \(error)") }
     }
   }
 
@@ -98,28 +58,7 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate, SPUSta
   }
 
   static func showMessage(msgText: String?) {
-    let center = UNUserNotificationCenter.current()
-    center.requestAuthorization(options: [.alert, .provisional]) { _, error in
-      if let error = error {
-        print("User notification authorization error: \(error.localizedDescription)")
-      }
-    }
-    center.getNotificationSettings { settings in
-      if (settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional) && settings.alertSetting == .enabled {
-        let content = UNMutableNotificationContent()
-        content.title = NSLocalizedString("Squirrel", comment: "")
-        if let msgText = msgText {
-          content.subtitle = msgText
-        }
-        content.interruptionLevel = .active
-        let request = UNNotificationRequest(identifier: Self.notificationIdentifier, content: content, trigger: nil)
-        center.add(request) { error in
-          if let error = error {
-            print("User notification request error: \(error.localizedDescription)")
-          }
-        }
-      }
-    }
+    if let msgText { NSLog("QingType: \(msgText)") }
   }
 
   func setupRime() {
@@ -135,10 +74,10 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate, SPUSta
     squirrelTraits.setCString(Bundle.main.sharedSupportPath!, to: \.shared_data_dir)
     squirrelTraits.setCString(SquirrelApp.userDir.path(), to: \.user_data_dir)
     squirrelTraits.setCString(SquirrelApp.logDir.path(), to: \.log_dir)
-    squirrelTraits.setCString("Squirrel", to: \.distribution_code_name)
-    squirrelTraits.setCString("鼠鬚管", to: \.distribution_name)
+    squirrelTraits.setCString("QingType", to: \.distribution_code_name)
+    squirrelTraits.setCString("清言输入法", to: \.distribution_name)
     squirrelTraits.setCString(Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as! String, to: \.distribution_version)
-    squirrelTraits.setCString("rime.squirrel", to: \.app_name)
+    squirrelTraits.setCString("rime.qingtype", to: \.app_name)
     rimeAPI.setup(&squirrelTraits)
   }
 
@@ -188,7 +127,7 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate, SPUSta
   // prevent freezing the system
   func problematicLaunchDetected() -> Bool {
     var detected = false
-    let logFile = FileManager.default.temporaryDirectory.appendingPathComponent("squirrel_launch.json", conformingTo: .json)
+    let logFile = FileManager.default.temporaryDirectory.appendingPathComponent("qingtype_launch.json", conformingTo: .json)
     // print("[DEBUG] archive: \(logFile)")
     do {
       let archive = try Data(contentsOf: logFile, options: [.uncached])
@@ -223,8 +162,8 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate, SPUSta
     center.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil, queue: nil, using: workspaceWillPowerOff)
 
     let notifCenter = DistributedNotificationCenter.default()
-    notifCenter.addObserver(forName: .init("SquirrelReloadNotification"), object: nil, queue: nil, using: rimeNeedsReload)
-    notifCenter.addObserver(forName: .init("SquirrelSyncNotification"), object: nil, queue: nil, using: rimeNeedsSync)
+    notifCenter.addObserver(forName: .init("QingTypeReloadNotification"), object: nil, queue: nil, using: rimeNeedsReload)
+    notifCenter.addObserver(forName: .init("QingTypeSyncNotification"), object: nil, queue: nil, using: rimeNeedsSync)
   }
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

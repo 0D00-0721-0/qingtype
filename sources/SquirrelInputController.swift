@@ -1,5 +1,5 @@
 //
-//  SquirrelInputController.swift
+//  QingTypeInputController.swift
 //  Squirrel
 //
 //  Created by Leo Liu on 5/7/24.
@@ -7,7 +7,7 @@
 
 import InputMethodKit
 
-final class SquirrelInputController: IMKInputController {
+final class QingTypeInputController: IMKInputController {
   private static let keyRollOver = 50
   private static var unknownAppCnt: UInt = 0
 
@@ -22,12 +22,16 @@ final class SquirrelInputController: IMKInputController {
   private var inlinePreedit = false
   private var inlineCandidate = false
   // for chord-typing
-  private var chordKeyCodes: [UInt32] = .init(repeating: 0, count: SquirrelInputController.keyRollOver)
-  private var chordModifiers: [UInt32] = .init(repeating: 0, count: SquirrelInputController.keyRollOver)
+  private var chordKeyCodes: [UInt32] = .init(repeating: 0, count: QingTypeInputController.keyRollOver)
+  private var chordModifiers: [UInt32] = .init(repeating: 0, count: QingTypeInputController.keyRollOver)
   private var chordKeyCount: Int = 0
   private var chordTimer: Timer?
   private var chordDuration: TimeInterval = 0
   private var currentApp: String = ""
+  private var candidatePresenter: QingTypeCandidatePresenter?
+  private var currentCandidates: [QingTypeCandidate] = []
+  private var currentSettings = QingTypeSettings()
+
 
   // swiftlint:disable:next cyclomatic_complexity
   override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
@@ -94,6 +98,10 @@ final class SquirrelInputController: IMKInputController {
     case .keyDown:
       // ignore Command+X hotkeys.
       if modifiers.contains(.command) {
+        break
+      }
+      if currentSettings.useSystemCandidates, candidatePresenter?.handleKey(event) == true {
+        handled = true
         break
       }
 
@@ -181,6 +189,7 @@ final class SquirrelInputController: IMKInputController {
     if keyboardLayout != "" {
       client?.overrideKeyboard(withKeyboardNamed: keyboardLayout)
     }
+    currentSettings = (try? QingTypeSettings.load()) ?? QingTypeSettings()
     preedit = ""
   }
 
@@ -199,6 +208,8 @@ final class SquirrelInputController: IMKInputController {
   }
 
   override func hidePalettes() {
+    candidatePresenter?.hide()
+    currentCandidates = []
     NSApp.squirrelAppDelegate.panel?.hide()
     super.hidePalettes()
   }
@@ -226,19 +237,17 @@ final class SquirrelInputController: IMKInputController {
   }
 
   override func menu() -> NSMenu! {
-    let deploy = NSMenuItem(title: NSLocalizedString("Deploy", comment: "Menu item"), action: #selector(deploy), keyEquivalent: "`")
+    let deploy = NSMenuItem(title: "重新部署", action: #selector(deploy), keyEquivalent: "`")
     deploy.target = self
     deploy.keyEquivalentModifierMask = [.control, .option]
-    let sync = NSMenuItem(title: NSLocalizedString("Sync user data", comment: "Menu item"), action: #selector(syncUserData), keyEquivalent: "")
+    let sync = NSMenuItem(title: "同步用户词库", action: #selector(syncUserData), keyEquivalent: "")
     sync.target = self
-    let logDir = NSMenuItem(title: NSLocalizedString("Logs...", comment: "Menu item"), action: #selector(openLogFolder), keyEquivalent: "")
+    let logDir = NSMenuItem(title: "打开日志…", action: #selector(openLogFolder), keyEquivalent: "")
     logDir.target = self
-    let setting = NSMenuItem(title: NSLocalizedString("Settings...", comment: "Menu item"), action: #selector(openRimeFolder), keyEquivalent: "")
+    let setting = NSMenuItem(title: "清言设置…", action: #selector(openSettings), keyEquivalent: "")
     setting.target = self
     let wiki = NSMenuItem(title: NSLocalizedString("Rime Wiki...", comment: "Menu item"), action: #selector(openWiki), keyEquivalent: "")
     wiki.target = self
-    let update = NSMenuItem(title: NSLocalizedString("Check for updates...", comment: "Menu item"), action: #selector(checkForUpdates), keyEquivalent: "")
-    update.target = self
 
     let menu = NSMenu()
     menu.addItem(deploy)
@@ -246,7 +255,10 @@ final class SquirrelInputController: IMKInputController {
     menu.addItem(logDir)
     menu.addItem(setting)
     menu.addItem(wiki)
-    menu.addItem(update)
+    menu.addItem(.separator())
+    let folder = NSMenuItem(title: "打开配置文件夹…", action: #selector(openRimeFolder), keyEquivalent: "")
+    folder.target = self
+    menu.addItem(folder)
 
     return menu
   }
@@ -267,8 +279,8 @@ final class SquirrelInputController: IMKInputController {
     NSApp.squirrelAppDelegate.openRimeFolder()
   }
 
-  @objc func checkForUpdates() {
-    NSApp.squirrelAppDelegate.checkForUpdates()
+  @objc func openSettings() {
+    NSApp.squirrelAppDelegate.openSettings()
   }
 
   @objc func openWiki() {
@@ -280,7 +292,7 @@ final class SquirrelInputController: IMKInputController {
   }
 }
 
-private extension SquirrelInputController {
+private extension QingTypeInputController {
 
   func onChordTimer(_: Timer) {
     // chord release triggered by timer
@@ -335,8 +347,8 @@ private extension SquirrelInputController {
 
   func createSession() {
     let app = client?.bundleIdentifier() ?? {
-      SquirrelInputController.unknownAppCnt &+= 1
-      return "UnknownApp\(SquirrelInputController.unknownAppCnt)"
+      QingTypeInputController.unknownAppCnt &+= 1
+      return "UnknownApp\(QingTypeInputController.unknownAppCnt)"
     }()
     print("createSession: \(app)")
     currentApp = app
@@ -436,8 +448,10 @@ private extension SquirrelInputController {
         schemaId = String(cString: schema_id)
         NSApp.squirrelAppDelegate.loadSettings(for: schemaId)
         // inline preedit
+        currentSettings = (try? QingTypeSettings.load()) ?? QingTypeSettings()
         if let panel = NSApp.squirrelAppDelegate.panel {
           inlinePreedit = (panel.inlinePreedit && !rimeAPI.get_option(session, "no_inline")) || rimeAPI.get_option(session, "inline")
+          if currentSettings.useSystemCandidates { inlinePreedit = true }
           inlineCandidate = panel.inlineCandidate && !rimeAPI.get_option(session, "no_inline")
           // if not inline, embed soft cursor in preedit string
           rimeAPI.set_option(session, "soft_cursor", !inlinePreedit)
@@ -537,7 +551,7 @@ private extension SquirrelInputController {
       let selRange = NSRange(location: start.utf16Offset(in: preedit), length: preedit.utf16.distance(from: start, to: end))
       showPanel(preedit: inlinePreedit ? "" : preedit, selRange: selRange, caretPos: caretPos.utf16Offset(in: preedit),
                 candidates: candidates, comments: comments, labels: labels, highlighted: Int(ctx.menu.highlighted_candidate_index),
-                page: page, lastPage: lastPage)
+                page: page, pageSize: Int(ctx.menu.page_size), lastPage: lastPage)
       _ = rimeAPI.free_context(&ctx)
     } else {
       hidePalettes()
@@ -577,11 +591,31 @@ private extension SquirrelInputController {
   }
 
   // swiftlint:disable:next function_parameter_count
-  func showPanel(preedit: String, selRange: NSRange, caretPos: Int, candidates: [String], comments: [String], labels: [String], highlighted: Int, page: Int, lastPage: Bool) {
+  func showPanel(preedit: String, selRange: NSRange, caretPos: Int, candidates: [String], comments: [String], labels: [String], highlighted: Int, page: Int, pageSize: Int, lastPage: Bool) {
     // print("[DEBUG] showPanelWithPreedit:...:")
     guard let client = client else { return }
     var inputPos = NSRect()
     client.attributes(forCharacterIndex: 0, lineHeightRectangle: &inputPos)
+    if currentSettings.useSystemCandidates {
+      NSApp.squirrelAppDelegate.panel?.hide()
+      if candidatePresenter == nil {
+        let presenter = QingTypeCandidatePresenter()
+        presenter.onSelect = { [weak self] index in
+          guard let self else { return }
+          if self.rimeAPI.select_candidate(self.session, index) { self.rimeUpdate() }
+        }
+        candidatePresenter = presenter
+      }
+      let start = page * pageSize
+      currentCandidates = QingTypeCandidateSource.read(api: rimeAPI, session: session, startingAt: start)
+      if currentCandidates.isEmpty {
+        currentCandidates = candidates.enumerated().map { QingTypeCandidate(index: start + $0.offset, text: $0.element) }
+      }
+      candidatePresenter?.update(candidates: currentCandidates, highlighted: start + highlighted,
+                               settings: currentSettings, caretRect: inputPos, composition: self.preedit)
+      return
+    }
+    candidatePresenter?.hide()
     if let panel = NSApp.squirrelAppDelegate.panel {
       panel.position = inputPos
       panel.inputController = self

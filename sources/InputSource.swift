@@ -11,8 +11,8 @@ import InputMethodKit
 final class SquirrelInstaller {
   enum InputMode: String, CaseIterable {
     static let primary = Self.hans
-    case hans = "im.rime.inputmethod.Squirrel.Hans"
-    case hant = "im.rime.inputmethod.Squirrel.Hant"
+    case hans = "org.qingtype.inputmethod.QingType.Hans"
+    case hant = "org.qingtype.inputmethod.QingType.Hant"
   }
   private lazy var inputSources: [String: TISInputSource] = {
     var inputSources = [String: TISInputSource]()
@@ -40,21 +40,30 @@ final class SquirrelInstaller {
     return Array(enabledModes)
   }
 
-  func register() {
-    let enabledInputModes = enabledModes()
-    if !enabledInputModes.isEmpty {
-      print("User already registered Squirrel method(s): \(enabledInputModes.map { $0.rawValue })")
-      // Already registered.
-      return
+  func status() -> [[String: Any]] {
+    InputMode.allCases.map { mode in
+      guard let source = inputSources[mode.rawValue] else {
+        return ["id": mode.rawValue, "registered": false]
+      }
+      return ["id": mode.rawValue, "registered": true,
+              "enabled": getBool(for: source, key: kTISPropertyInputSourceIsEnabled) ?? false,
+              "selected": getBool(for: source, key: kTISPropertyInputSourceIsSelected) ?? false,
+              "selectable": getBool(for: source, key: kTISPropertyInputSourceIsSelectCapable) ?? false]
     }
-    TISRegisterInputSource(SquirrelApp.appDir as CFURL)
-    print("Registered input source from \(SquirrelApp.appDir)")
+  }
+
+  func register() {
+    // Register the installed URL on every update, even if a mode is enabled.
+    // Enabled state alone says nothing about another process's cached source.
+    let result = TISRegisterInputSource(SquirrelApp.appDir as CFURL)
+    print("Register QingType: \(result) from \(SquirrelApp.appDir.path)")
+    if result != noErr { exit(1) }
   }
 
   func enable(modes: [InputMode] = []) {
     let enabledInputModes = enabledModes()
     if !enabledInputModes.isEmpty && modes.isEmpty {
-      print("User already enabled Squirrel method(s): \(enabledInputModes.map { $0.rawValue })")
+      print("User already enabled QingType method(s): \(enabledInputModes.map { $0.rawValue })")
       // keep user's manually enabled input modes.
       return
     }
@@ -84,7 +93,8 @@ final class SquirrelInstaller {
          let selected = getBool(for: inputSource, key: kTISPropertyInputSourceIsSelected),
          enabled && selectable && !selected {
         let error = TISSelectInputSource(inputSource)
-        print("Selection \(error == noErr ? "succeeds" : "fails") for input source: \(mode.rawValue)")
+        print("Selection \(error == noErr ? "succeeds" : "fails") (OSStatus \(error)) for input source: \(mode.rawValue)")
+        if error != noErr { exit(1) }
       } else {
         print("Failed to select \(mode.rawValue)")
       }

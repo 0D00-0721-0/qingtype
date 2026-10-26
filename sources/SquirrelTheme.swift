@@ -11,7 +11,7 @@ final class SquirrelTheme {
   static let offsetHeight: CGFloat = 5
   static let defaultFontSize: CGFloat = NSFont.systemFontSize
   static let showStatusDuration: Double = 1.2
-  static let defaultFont = NSFont.userFont(ofSize: defaultFontSize)!
+  static let defaultFont = NSFont.systemFont(ofSize: defaultFontSize)
 
   enum StatusMessageType: String {
     case long, short, mix
@@ -32,9 +32,9 @@ final class SquirrelTheme {
   private(set) var memorizeSize = true
   private var colorSpace: RimeColorSpace = .sRGB
 
-  var backgroundColor: NSColor = .windowBackgroundColor
+  var backgroundColor: NSColor = .windowBackgroundColor.withAlphaComponent(0.94)
   var highlightedPreeditColor: NSColor?
-  var highlightedBackColor: NSColor? = .selectedTextBackgroundColor
+  var highlightedBackColor: NSColor? = .selectedContentBackgroundColor
   var preeditBackgroundColor: NSColor?
   var candidateBackColor: NSColor?
   var borderColor: NSColor?
@@ -42,11 +42,11 @@ final class SquirrelTheme {
   private var textColor: NSColor = .secondaryLabelColor
   private var highlightedTextColor: NSColor = .labelColor
   private var candidateTextColor: NSColor = .labelColor
-  private var highlightedCandidateTextColor: NSColor = .labelColor
+  private var highlightedCandidateTextColor: NSColor = .alternateSelectedControlTextColor
   private var candidateLabelColor: NSColor? = .secondaryLabelColor
-  private var highlightedCandidateLabelColor: NSColor? = .secondaryLabelColor
+  private var highlightedCandidateLabelColor: NSColor? = .alternateSelectedControlTextColor.withAlphaComponent(0.8)
   private var commentTextColor: NSColor? = .secondaryLabelColor
-  private var highlightedCommentTextColor: NSColor? = .secondaryLabelColor
+  private var highlightedCommentTextColor: NSColor? = .alternateSelectedControlTextColor.withAlphaComponent(0.8)
 
   private(set) var cornerRadius: CGFloat = 0
   private(set) var hilitedCornerRadius: CGFloat = 0
