@@ -9,9 +9,14 @@ build/settings-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/ContentTests.swift "${yaml_flags[@]}" -o build/content-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/PersonalDictionaryTests.swift "${yaml_flags[@]}" -o build/personal-dictionary-tests
 build/personal-dictionary-tests
+swiftc -parse-as-library -swift-version 5 shared/*.swift tests/RimeIceTests.swift "${yaml_flags[@]}" -o build/rime-ice-tests
+build/rime-ice-tests
 build/content-tests
 build/QingType.app/Contents/MacOS/QingType --engine-smoke-test
 build/QingType.app/Contents/MacOS/QingType --personal-dictionary-engine-test
+if [[ -n "${QINGTYPE_RIME_ICE_TEST_PACKAGE:-}" ]]; then
+  build/QingType.app/Contents/MacOS/QingType --rime-ice-engine-test "$QINGTYPE_RIME_ICE_TEST_PACKAGE"
+fi
 build/QingType.app/Contents/MacOS/QingType --candidate-ui-test
 python3 tests/InputSourceCacheTests.py
 build/QingType.app/Contents/MacOS/QingType --status > build/input-source-status.json

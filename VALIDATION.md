@@ -1,8 +1,47 @@
-# Local validation — 2026-10-27 — QingType 0.3.0
+# Local validation — 2026-10-27 — QingType 0.3.1
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
+
+## Rime Ice integration — 0.3.1 (2026-10-27)
+
+The user confirmed the complete Rime Ice scheme, with QingType's native candidate
+window and settings as the priority. Its AppKit/SwiftUI presentation remains in
+use; the package's client configuration and themes are excluded.
+
+The official Release downloader validates full.zip size and GitHub's SHA-256
+digest, checks ZIP paths/types/bounds, then installs the three schema dependencies,
+Chinese/English dictionaries, Lua (including lunar.db), OpenCC and symbol resources.
+Package defaults are namespaced rather than replacing existing defaults, phrases,
+Xiaohe files or user custom patches. A manifest, upstream license, owned-file
+conflict checks, resource backups and activation rollback are included.
+
+160 internal checks passed: the prior 116, one numeric dictionary-name import
+regression, 27 package/isolation/rollback/archive checks and 16 real-engine checks.
+The latter use the complete official package in a temporary directory: nihao,
+configured page size, personal selection and exact commit, English, Lua date and
+lunar data, quick phrases, restart, fixed-row deletion and stable learning identity.
+The fixed personal-source checks disable learning; Phase 2 behavior remains pending.
+
+A separate 17-check run used the existing local simplified Wanxiang model. The
+plugin output confirms its grammar language, .gram load and double-array image,
+in addition to candidate functionality. No model or user words are committed.
+
+0.3.1 is installed locally. A command-line harness calling the same native download
+and DeploymentService functions successfully installed the official package and
+verified the active, unchanged scheme plus actual model load. All 59 installed
+resource hashes match. Every pre-existing settings value is unchanged; the old
+JSON gained the expected empty personalWords field and rimeIce metadata. The
+current selected schema remains Luna simplified; Rime Ice can be selected in the
+input settings and applied. Source Rime data is not a writable target.
+
+The new graphical controls compile, but live window inspection was blocked by a
+locked Mac. This is not recorded as a successful UI click-through. Actual typing
+and candidate-window acceptance is deferred at the user's request. Local evidence
+is in ignored build/rime-ice-tests.log, rime-ice-model-test.log,
+rime-ice-install-result.json and the deployment logs. CI additionally fetches a
+fixed upstream Rime Ice commit; its result must be checked against the pushed head.
 
 
 ## Phase 0 / Phase 1 — 0.3.0 (2026-10-27)

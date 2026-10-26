@@ -18,7 +18,8 @@ enum QingTypeMaintenance {
     if api.start_maintenance(true) { api.join_maintenance_thread() }
     // A stale compiled table can still answer nihao after a failed rebuild.
     // Require the explicit schema/dictionary compiler result as well.
-    let schemaFile = URL(fileURLWithPath: Bundle.main.sharedSupportPath!).appendingPathComponent(settings.schema + ".schema.yaml")
+    let userSchema = directory.appendingPathComponent(settings.schema + ".schema.yaml")
+    let schemaFile = FileManager.default.fileExists(atPath: userSchema.path) ? userSchema : URL(fileURLWithPath: Bundle.main.sharedSupportPath!).appendingPathComponent(settings.schema + ".schema.yaml")
     let schemaReady = api.deploy_schema(schemaFile.path)
     let configReady = api.deploy_config_file("squirrel.yaml", "config_version")
     let session = api.create_session()
@@ -44,9 +45,10 @@ enum QingTypeMaintenance {
     let translator = header?["translator"] as? [String: Any]
     let prism = translator?["prism"] as? String ?? ""
     let dictionary = translator?["dictionary"] as? String ?? ""
+    let expectedDictionary = settings.schema == "rime_ice" ? QingTypeRimeIce.dictionaryName : "qingtype_main"
     let binaryReady = FileManager.default.fileExists(atPath: directory.appendingPathComponent("build/\(prism).prism.bin").path) &&
-      FileManager.default.fileExists(atPath: directory.appendingPathComponent("build/qingtype_main.table.bin").path)
-    let success = schemaReady && configReady && selected && hasCandidates && binaryReady && dictionary == "qingtype_main"
+      FileManager.default.fileExists(atPath: directory.appendingPathComponent("build/\(expectedDictionary).table.bin").path)
+    let success = schemaReady && configReady && selected && hasCandidates && binaryReady && dictionary == expectedDictionary
     return QingTypeDeploymentReport(success: success,
       settingsHash: try QingTypeContent.digest(of: directory.appendingPathComponent("settings.json")),
       schema: settings.schema, dictionaryCount: settings.dictionaries.filter(\.enabled).count,

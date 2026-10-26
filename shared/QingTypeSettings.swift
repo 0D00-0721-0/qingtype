@@ -26,6 +26,7 @@ struct QingTypeSettings: Codable, Equatable {
   var dictionaries: [DictionaryAsset] = []
   var models: [GrammarAsset] = []
   var activeModelID: String?
+  var rimeIce: RimeIceAsset?
 
   var activeModel: GrammarAsset? { models.first { $0.id == activeModelID } }
 
@@ -33,7 +34,7 @@ struct QingTypeSettings: Codable, Equatable {
 
   enum CodingKeys: String, CodingKey {
     case schema, layout, fontSize, pageSize, inlinePreedit, useShift, phrases, personalWords
-    case useSystemCandidates, dictionaries, models, activeModelID
+    case useSystemCandidates, dictionaries, models, activeModelID, rimeIce
   }
 
   init(from decoder: Decoder) throws {
@@ -51,6 +52,7 @@ struct QingTypeSettings: Codable, Equatable {
     dictionaries = try values.decodeIfPresent([DictionaryAsset].self, forKey: .dictionaries) ?? []
     models = try values.decodeIfPresent([GrammarAsset].self, forKey: .models) ?? []
     activeModelID = try values.decodeIfPresent(String.self, forKey: .activeModelID)
+    rimeIce = try values.decodeIfPresent(RimeIceAsset.self, forKey: .rimeIce)
   }
 
   static let managedHeader = "# Managed by QingType Settings.\n"
@@ -73,7 +75,9 @@ struct QingTypeSettings: Codable, Equatable {
 
   func validate() throws {
     try QingTypePersonalDictionary.validate(personalWords)
-    guard ["luna_pinyin_simp", "luna_pinyin", "qingtype_double_pinyin"].contains(schema),
+    if let rimeIce { try QingTypeRimeIce.validate(rimeIce) }
+    guard schema != "rime_ice" || rimeIce != nil else { throw SettingsError.invalid("请先安装完整雾凇方案，再选择雾凇拼音。") }
+    guard ["luna_pinyin_simp", "luna_pinyin", "qingtype_double_pinyin", "rime_ice"].contains(schema),
           ["linear", "stacked"].contains(layout), (12...32).contains(fontSize),
           (3...9).contains(pageSize) else {
       throw SettingsError.invalid("设置值超出支持范围。")
@@ -152,14 +156,25 @@ struct QingTypeSettings: Codable, Equatable {
             "squirrel.custom.yaml": Data(appearance.utf8),
             "custom_phrase.txt": Data(phraseText.utf8)]
     files[QingTypePersonalDictionary.tableName + ".dict.yaml"] = try QingTypePersonalDictionary.dictionaryData(personalWords)
-    let tables = ["luna_pinyin"] + (personalWords.isEmpty ? [] : [QingTypePersonalDictionary.tableName]) + dictionaries.filter(\.enabled).flatMap(\.tables)
+    let personalTables = personalWords.isEmpty ? [] : [QingTypePersonalDictionary.tableName]
+    let tables = personalTables + ["luna_pinyin"] + dictionaries.filter(\.enabled).flatMap(\.tables)
     let dictionary: [String: Any] = ["name": "qingtype_main", "version": "0.2", "sort": "by_weight",
                                      "use_preset_vocabulary": true, "import_tables": tables]
     files["qingtype_main.dict.yaml"] = Data((Self.managedHeader + "---\n" + (try Yams.dump(object: dictionary)) + "...\n").utf8)
-    for schemaID in ["luna_pinyin_simp", "luna_pinyin", "qingtype_double_pinyin"] {
+    if let rimeIce {
+      var iceDictionary = dictionary
+      iceDictionary["name"] = QingTypeRimeIce.dictionaryName
+      iceDictionary["import_tables"] = personalTables + rimeIce.tables + dictionaries.filter(\.enabled).flatMap(\.tables)
+      files[QingTypeRimeIce.dictionaryName + ".dict.yaml"] = Data((Self.managedHeader + "---\n" + (try Yams.dump(object: iceDictionary)) + "...\n").utf8)
+    }
+    for schemaID in ["luna_pinyin_simp", "luna_pinyin", "qingtype_double_pinyin"] + (rimeIce == nil ? [] : ["rime_ice"]) {
       let prism = "qingtype_" + schemaID
-      var patch: [String: Any] = ["translator/dictionary": "qingtype_main", "translator/prism": prism,
+      var patch: [String: Any] = ["translator/dictionary": schemaID == "rime_ice" ? QingTypeRimeIce.dictionaryName : "qingtype_main", "translator/prism": prism,
                                    "grammar/language": activeModel?.language ?? ""]
+      if schemaID == "rime_ice" {
+        patch["translator/user_dict"] = "rime_ice"
+        patch["radical_reverse_lookup/dictionary"] = QingTypeRimeIce.dictionaryName
+      }
       if activeModel != nil {
         patch["grammar/collocation_prism"] = prism + ".prism"
         patch["translator/contextual_suggestions"] = false
@@ -176,7 +191,7 @@ struct QingTypeSettings: Codable, Equatable {
     let manager = FileManager.default
     try manager.createDirectory(at: directory, withIntermediateDirectories: true)
     let required = dictionaries.filter(\.enabled).flatMap(\.tables).map { $0 + ".dict.yaml" } +
-      (activeModel.map { [$0.language + ".gram"] } ?? [])
+      (activeModel.map { [$0.language + ".gram"] } ?? []) + (rimeIce?.files.map(\.path) ?? [])
     for name in required where !manager.fileExists(atPath: directory.appendingPathComponent(name).path) {
       throw SettingsError.invalid("缺少已启用的文件：\(name)，请重新导入。")
     }

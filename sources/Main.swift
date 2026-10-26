@@ -29,6 +29,9 @@ struct SquirrelApp {
       if CommandLine.arguments.contains("--personal-dictionary-engine-test") {
         return QingTypePersonalDictionaryDiagnostics.run(api: rimeAPI)
       }
+      if let index = CommandLine.arguments.firstIndex(of: "--rime-ice-engine-test"), CommandLine.arguments.count > index + 1 {
+        return QingTypeRimeIceDiagnostics.run(api: rimeAPI, package: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+      }
       if CommandLine.arguments.contains("--preview-system") {
         QingTypeDiagnostics.showSystemPreview()
         return true

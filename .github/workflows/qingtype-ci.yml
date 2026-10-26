@@ -15,6 +15,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+      - name: Fetch the pinned Rime Ice integration fixture
+        uses: actions/checkout@v6
+        with:
+          repository: iDvel/rime-ice
+          ref: da1fbe602e38f26db846fa10120ee64c2b0324c0
+          path: build/rime-ice-fixture
       - name: Fetch the pinned Rime headers
         run: git submodule update --init --depth 1 librime
       - name: Extract the upstream runtime without installing it
@@ -30,4 +36,6 @@ jobs:
       - name: Build QingType and settings
         run: ./scripts/build-dev.sh
       - name: Run isolated engine, UI contract and data-safety checks
+        env:
+          QINGTYPE_RIME_ICE_TEST_PACKAGE: ${{ github.workspace }}/build/rime-ice-fixture
         run: ./scripts/test.sh

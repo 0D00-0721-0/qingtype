@@ -9,6 +9,57 @@ enum DeploymentService {
   }
 
   @MainActor
+  static func installRimeIce(from source: URL, saved: QingTypeSettings, provenance: String, sha256: String?) async throws -> (QingTypeSettings, QingTypeDeploymentReport) {
+    let directory = QingTypePaths.userDirectory
+    guard try QingTypeSettings.load() == saved else { throw SettingsError.invalid("设置文件已被其他程序修改，请重开设置后再安装。") }
+    let running = NSRunningApplication.runningApplications(withBundleIdentifier: "org.qingtype.inputmethod.QingType")
+    for app in running { app.terminate() }
+    for _ in 0..<40 {
+      if running.allSatisfy(\.isTerminated) { break }
+      try await Task.sleep(nanoseconds: 100_000_000)
+    }
+    guard running.allSatisfy(\.isTerminated) else { throw SettingsError.invalid("输入法尚未退出，请结束当前输入后重新安装方案。") }
+    var restart = true
+    defer {
+      if restart && !running.isEmpty {
+        let config = NSWorkspace.OpenConfiguration(); config.activates = false
+        NSWorkspace.shared.openApplication(at: inputMethodURL(), configuration: config, completionHandler: nil)
+      }
+    }
+    let installation: RimeIceInstallation
+    do {
+      installation = try await Task.detached {
+        try QingTypeRimeIce.installPackage(from: source, into: directory, provenance: provenance, archiveSHA256: sha256)
+      }.value
+    } catch {
+      if error is RimeIceRecoveryError { restart = false }
+      throw error
+    }
+    var updated = saved
+    updated.rimeIce = installation.asset
+    do {
+      let report = try await QingTypeConfigurationApply.apply(updated, to: directory) {
+        try await runWorker(appURL: inputMethodURL())
+      }
+      return (updated, report)
+    } catch {
+      let reason = error.localizedDescription
+      restart = false
+      do {
+        try QingTypeRimeIce.rollback(installation, in: directory)
+        // A concurrent settings edit must never be silently reverted here.
+        guard try QingTypeSettings.load() == saved else { throw SettingsError.invalid("设置文件未恢复到安装前状态。") }
+        let recovery = try await runWorker(appURL: inputMethodURL())
+        guard recovery.success else { throw SettingsError.invalid(recovery.message) }
+        restart = true
+      } catch {
+        throw SettingsError.invalid("雾凇安装失败，恢复尚未通过，输入服务保持停止。备份：\(installation.backup.path)。\(reason)；\(error.localizedDescription)")
+      }
+      throw SettingsError.invalid("雾凇安装失败，已恢复上一版方案与配置。\(reason)")
+    }
+  }
+
+  @MainActor
   static func apply(_ settings: QingTypeSettings) async throws -> QingTypeDeploymentReport {
     let running = NSRunningApplication.runningApplications(withBundleIdentifier: "org.qingtype.inputmethod.QingType")
     for app in running { app.terminate() }

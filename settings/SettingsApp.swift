@@ -230,9 +230,11 @@ struct SettingsView: View {
           Text("全拼 · 简体中文").tag("luna_pinyin_simp")
           Text("全拼 · 繁体中文").tag("luna_pinyin")
           Text("小鹤双拼 · 简体中文").tag("qingtype_double_pinyin")
+          if model.settings.rimeIce != nil { Text("雾凇拼音 · 简体中文").tag("rime_ice") }
         }
         Stepper("每页候选数：\(model.settings.pageSize)", value: $model.settings.pageSize, in: 3...9)
       }
+      RimeIceSection(model: model)
       Section("试打") {
         TextField("切换到清言，在这里输入拼音", text: $model.sampleText, axis: .vertical)
           .lineLimit(2...4).accessibilityLabel("试打输入框")

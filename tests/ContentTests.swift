@@ -38,6 +38,9 @@ struct ContentTests {
     let without = try Yams.load(yaml: String(decoding: disabled["qingtype_main.dict.yaml"]!, as: UTF8.self)) as! [String: Any]
     try expect((without["import_tables"] as! [String]) == ["luna_pinyin"], "disabling a dictionary removes its tables")
     try expect(try String(contentsOf: input, encoding: .utf8) == aggregate, "source dictionary stays intact")
+    let numeric = source.appendingPathComponent("8105.dict.yaml")
+    try "---\nname: 8105\nversion: '1'\n...\n你\tni\t100\n".write(to: numeric, atomically: true, encoding: .utf8)
+    try expect(try QingTypeContent.importDictionary(from: numeric, into: destination).name == "8105", "unquoted numeric Rime Ice table names import as dictionary identifiers")
 
     try "---\nname: cycle\nimport_tables: [cycle]\n...\n".write(to: source.appendingPathComponent("cycle.dict.yaml"), atomically: true, encoding: .utf8)
     try rejects { _ = try QingTypeContent.importDictionary(from: source.appendingPathComponent("cycle.dict.yaml"), into: destination) }

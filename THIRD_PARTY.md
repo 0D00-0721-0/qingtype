@@ -40,3 +40,14 @@ Developer ID signature, notarization or distribution pipeline is configured yet.
   [Qingjian issue 346](https://github.com/qingjian-team/qingjian/issues/346).
   The cache backup helper here is independently implemented with a strict
   filename allowlist, reversible backups and symlink/root-boundary tests.
+
+- **Rime Ice**: GPL-3.0, [iDvel/rime-ice](https://github.com/iDvel/rime-ice).
+  Optional complete scheme installed by the user from the official release or
+  a local folder; not bundled in the app or Git repository. Its license is copied
+  with each installation, and a manifest records resource hashes and provenance.
+  Reference engine fixture: commit `da1fbe602e38f26db846fa10120ee64c2b0324c0`.
+  The official full.zip inspected on 2026-10-27 had SHA-256
+  `4e1e677cab1866e7610a350cd85b7bd07d1eeb58aeefff275a1ab3c060515d5e`.
+  The package includes third-party dictionaries and Lua/OpenCC resources with
+  upstream attribution; audit all component permissions again before public
+  redistribution. Current installation retains those source notices.

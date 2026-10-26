@@ -98,7 +98,8 @@ enum QingTypeContent {
       let lines = text.components(separatedBy: "\n")
       guard let separator = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "..." }),
             var header = try Yams.load(yaml: lines[..<separator].joined(separator: "\n")) as? [String: Any],
-            let name = header["name"] as? String, !name.isEmpty else {
+            let rawName = header["name"],
+            let name = (rawName as? String) ?? (rawName as? Int).map(String.init), !name.isEmpty else {
         throw SettingsError.invalid("\(url.lastPathComponent) 缺少有效的 Rime 词库头部或结束标记。")
       }
       guard !header.keys.contains(where: { $0.hasPrefix("__") }) else {
