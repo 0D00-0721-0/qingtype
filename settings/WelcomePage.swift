@@ -16,7 +16,8 @@ extension SettingsModel {
       do {
         deployment = try await InstallationService.install()
         settings = try .load(); saved = settings
-        message = "清言已安装并启用，可以从系统输入菜单选择清言开始输入。"
+        inputEnabled = (try? await InstallationService.state().enabled) ?? false
+        message = inputEnabled ? "清言已安装并启用，可以从系统输入菜单选择清言开始输入。" : "清言已安装。请打开键盘设置添加清言，再开始输入。"
       } catch { failed = true; message = error.localizedDescription }
     }
   }
@@ -93,7 +94,7 @@ struct WelcomePage: View {
               Button(installTitle, action: model.installInputMethod).buttonStyle(.borderedProminent)
                 .disabled(model.busy || model.loadFailed)
             }
-            Button("打开键盘设置", action: model.openKeyboardSettings)
+            Button("打开键盘设置", action: model.openKeyboardSettings).disabled(model.busy)
             if let version = model.installedVersion { Text("已安装 \(version)").font(.caption).foregroundStyle(.secondary) }
           }
           if model.inputReady { Button("切换到清言", action: model.selectQingType).disabled(model.busy) }

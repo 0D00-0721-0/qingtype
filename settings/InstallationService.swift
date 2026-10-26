@@ -73,7 +73,8 @@ enum InstallationService {
         if try await state().enabled { break }
         try await Task.sleep(nanoseconds: 800_000_000)
       }
-      guard try await state().enabled else { throw SettingsError.invalid("程序已复制，但系统尚未启用清言。请打开键盘设置添加清言后重试。") }
+      // Some macOS versions require manual input-source addition. Keep a valid,
+      // deployed app installed so Keyboard Settings can actually find it.
       let settings = try QingTypeSettings.load()
       report = try await QingTypeConfigurationApply.apply(settings, to: QingTypePaths.userDirectory) {
         try await DeploymentService.runWorker(appURL: installedURL)

@@ -22,10 +22,10 @@
 - 与欢迎页相同的 InstallationService 已在本机执行 0.4.0 安装/启用/部署，模型加载通过、全部已有设置值一致。正常应用已安装到 ~/Applications/清言.app，DMG 在 build/distribution。当前用户仍保留原全拼/模型/雾凇资源，不因升级替其重新选择。
 - 新版原生雾凇下载器已实际下载、核验并在临时目录安装 59 个资源；没有向用户现有配置重新安装方案。
 - 原生候选窗的现有交互回归通过；新增窗口实际检查因 Mac 锁屏无法访问。真实键盘验收由用户择时进行，目前明确延期，不要再要求其立即试打。
-- 0.3.1 远端 CI 40369358559 已确认通过；0.4.0 新增默认运行库引导、安装测试与 DMG 检查的 CI 尚需在推送后核对。
+- 0.3.1 远端 CI 40369358559 已确认通过；0.4.0 主体 bda710a 的 [CI 40376551940](https://github.com/0D00-0721-0/qingtype/actions/runs/40376551940) 也已通过，包含默认运行库引导、完整测试及 DMG 挂载检查。随后补充了系统需手动添加输入源时保留已部署程序的引导，本机重编译/186 项回归/打包/安装复核均通过；该小修正的远端 CI 还待推送后核对。
 
 ## 接下来与限制
 
-1. 完成 0.4.0 最终打包/源码同步与新 CI 状态核对；本地证据位于 build/setup-tests.log、distribution-tests.log、native-install-040.log、factory-wanxiang-test.log、setup-ice-wanxiang-test.log、wanxiang-download*.log。
+1. 核对手动添加输入源引导修正的最终远端 CI；不要重复下载资源或要求用户立即试打。0.4.0 正常应用和输入服务已安装，最新 DMG 已生成。本地证据位于 build/setup-tests.log、distribution-tests.log、native-install-040.log、factory-wanxiang-test.log、setup-ice-wanxiang-test.log、wanxiang-download*.log。
 2. 本机 security find-identity 返回 0 个有效身份：测试包临时签名，Developer ID/公证尚未执行，不能称为免拦截正式发行；也未发布公开二进制 Release。
 3. 仍待干净 Mac 的图形安装/升级/卸载、真实应用/多屏/休眠和长时间验收，第三方分发授权完整审计、原生卸载与应用自动更新。自动学习闭环仍是 Phase 2，个人词库人工验收仍待用户确认；不要把数据文件保护或引擎测试当作行为验收。
