@@ -37,6 +37,7 @@ enum QingTypeDiagnostics {
            "collapsed chevron is inside its owner and cannot overlap candidate cells")
     expect(!presenter.handleKey(code: 123, text: nil) && !presenter.handleKey(code: 124, text: nil),
            "collapsed left/right keys remain available for editing pinyin")
+    expect(!presenter.handleKey(code: 36, text: "\r"), "collapsed Return remains available for raw-pinyin commit")
     let arrow = window.contentView!.subviews.compactMap { $0 as? NSButton }.first!
     arrow.performClick(nil)
     expect(presenter.isExpanded && ObjectIdentifier(presenter.window) == identity, "the actual chevron action expands its own window")

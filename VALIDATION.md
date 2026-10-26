@@ -24,7 +24,7 @@ before/after installation. Real QQ input remains user validation;
 this document does not claim that a successful engine test proves QQ is fixed.
 
 The old IMKCandidates + floating arrow + separate grid implementation below is
-superseded. One AppKit panel now owns all candidate controls. Sixteen new UI checks cover
+superseded. One AppKit panel now owns all candidate controls. Seventeen new UI checks cover
 caret placement in a negative-origin display, screen-edge flipping, separate
 arrow hit regions, same-window expansion, selection/scroll persistence, Escape,
 and absolute-index numeric and Space selection. The cache helper tests preserve

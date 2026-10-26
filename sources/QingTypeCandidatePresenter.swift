@@ -76,7 +76,11 @@ final class QingTypeCandidatePresenter {
     case 126:
       if !isExpanded { return false }
       window.move(horizontal: 0, vertical: -1)
-    case 36, 76, 49: window.pickSelected()
+    case 36, 76:
+      // Rime uses Return to commit raw pinyin in the collapsed presentation.
+      guard isExpanded else { return false }
+      window.pickSelected()
+    case 49: window.pickSelected()
     default:
       guard let text, text.count == 1, let number = Int(text) else { return false }
       return window.pickNumber(number)
