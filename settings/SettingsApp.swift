@@ -383,7 +383,8 @@ struct SettingsView: View {
         Image(systemName: "character.bubble.fill").font(.system(size: 44)).foregroundStyle(.tint)
         VStack(alignment: .leading, spacing: 5) {
           Text("清言输入法").font(.title2.bold())
-          Text("0.2.0 · 本地开发版").foregroundStyle(.secondary)
+          Text("\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "版本未知") · 本地开发版")
+            .foregroundStyle(.secondary)
         }
       }
       GroupBox("启用输入法") {
