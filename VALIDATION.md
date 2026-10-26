@@ -1,11 +1,33 @@
-# Local validation — 2026-10-26 — QingType 0.2.1
+# Local validation — 2026-10-26 — QingType 0.2.2
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
 
-## 0.2.1 regression repair (current)
+## 0.2.2 Safari input-source selection
+
+User reported that selecting QingType in Safari had no effect. The Safari
+keyboard-source cache already contained QingType, so the earlier QQ diagnosis
+alone did not explain this failure. Launch logs also recorded two QingType app
+copies competing for the same endpoint.
+
+The generated InputMethodConnectionName now uses the full bundle identifier plus
+_Connection, matching the connection naming convention documented by the
+[vChewing developer's IMK notes](https://github.com/ShikiSuen/ShikiSuen/blob/main/TechNotes/macOS_Input_Method_Development_Guidelines_2026/macOS_Input_Method_Development_Guidelines_2026-ENU.md).
+The service refuses a second instance and checks IMKServer creation. The weak
+client binding is refreshed on each key event and activation, and lifecycle logs
+contain application identifiers rather than typed text. Bundle checks now guard
+the connection convention and matching input-method/settings versions.
+
+Build, signature verification and the existing 61 internal checks passed.
+After installing 0.2.2, a fresh TIS selection returned OSStatus 0 and selected=true.
+That alone did not prove Safari acceptance: the user initially still could not
+switch in the already-running Safari process. The user then completely restarted
+Safari and explicitly confirmed that switching worked. This confirms recovery in
+that session; other browser/application combinations remain separate validation.
+
+## 0.2.1 regression repair
 
 QQ produced two matching crash reports inside the system source-switching HUD:
 `TISCopyInputSourceRefForInputSourceID` returned NULL, then the framework called

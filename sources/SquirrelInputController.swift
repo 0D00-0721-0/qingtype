@@ -52,7 +52,7 @@ final class QingTypeInputController: IMKInputController {
       }
     }
 
-    self.client ?= sender as? IMKTextInput
+    self.client = sender as? IMKTextInput
     if let app = client?.bundleIdentifier(), currentApp != app {
       currentApp = app
       updateAppOptions()
@@ -176,7 +176,8 @@ final class QingTypeInputController: IMKInputController {
   }
 
   override func activateServer(_ sender: Any!) {
-    self.client ?= sender as? IMKTextInput
+    self.client = sender as? IMKTextInput
+    NSLog("QingType session activated: %@", client?.bundleIdentifier() ?? "unknown")
     // print("[DEBUG] activateServer:")
     var keyboardLayout = NSApp.squirrelAppDelegate.config?.getString("keyboard_layout") ?? ""
     if keyboardLayout == "last" || keyboardLayout == "" {
@@ -201,6 +202,7 @@ final class QingTypeInputController: IMKInputController {
   }
 
   override func deactivateServer(_ sender: Any!) {
+    NSLog("QingType session deactivated: %@", currentApp)
     // print("[DEBUG] deactivateServer: \(sender ?? "nil")")
     hidePalettes()
     commitComposition(sender)
@@ -350,7 +352,7 @@ private extension QingTypeInputController {
       QingTypeInputController.unknownAppCnt &+= 1
       return "UnknownApp\(QingTypeInputController.unknownAppCnt)"
     }()
-    print("createSession: \(app)")
+    NSLog("QingType session created: %@", app)
     currentApp = app
     session = rimeAPI.create_session()
     schemaId = ""

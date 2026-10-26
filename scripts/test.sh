@@ -19,10 +19,12 @@ import json
 app = Path('build/QingType.app/Contents')
 info = plistlib.loads((app / 'Info.plist').read_bytes())
 assert info['CFBundleIdentifier'] == 'org.qingtype.inputmethod.QingType'
-assert info['InputMethodConnectionName'] == 'QingType_Connection'
+assert info['InputMethodConnectionName'] == info['CFBundleIdentifier'] + '_Connection'
 assert info['InputMethodServerControllerClass'] == 'QingType.QingTypeInputController', info
 assert not any(key.startswith('SU') for key in info)
 assert (app / 'Applications/QingType Settings.app/Contents/MacOS/QingTypeSettings').is_file()
+settings_info = plistlib.loads((app / 'Applications/QingType Settings.app/Contents/Info.plist').read_bytes())
+assert settings_info['CFBundleShortVersionString'] == info['CFBundleShortVersionString']
 assert json.loads(Path('build/input-source-status.json').read_text())['controllerClassFound']
 print('PASS: input source identity, settings bundle, and update isolation')
 PY

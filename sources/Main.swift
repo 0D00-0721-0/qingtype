@@ -155,10 +155,21 @@ struct SquirrelApp {
     }
 
     autoreleasepool {
+      // CLI diagnostics above are independent. A second service instance must
+      // never compete with the installed input method for its IMK endpoint.
+      if let existing = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier!)
+        .first(where: { $0.processIdentifier != getpid() && !$0.isTerminated }) {
+        NSLog("QingType service already running, pid=%d", existing.processIdentifier)
+        return
+      }
       // find the bundle identifier and then initialize the input method server
       let main = Bundle.main
       let connectionName = main.object(forInfoDictionaryKey: "InputMethodConnectionName") as! String
-      let server = IMKServer(name: connectionName, bundleIdentifier: main.bundleIdentifier!)
+      guard let server = IMKServer(name: connectionName, bundleIdentifier: main.bundleIdentifier!) else {
+        NSLog("Cannot create QingType IMKServer for %@", connectionName)
+        return
+      }
+      NSLog("QingType IMKServer ready: %@", connectionName)
       // load the bundle explicitly because in this case the input method is a
       // background only application
       let app = NSApplication.shared
