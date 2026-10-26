@@ -190,8 +190,9 @@ struct QingTypeSettings: Codable, Equatable {
     let files = try generatedFiles()
     let manager = FileManager.default
     try manager.createDirectory(at: directory, withIntermediateDirectories: true)
-    let required = dictionaries.filter(\.enabled).flatMap(\.tables).map { $0 + ".dict.yaml" } +
-      (activeModel.map { [$0.language + ".gram"] } ?? []) + (rimeIce?.files.map(\.path) ?? [])
+    var required: [String] = dictionaries.filter(\.enabled).flatMap(\.tables).map { $0 + ".dict.yaml" }
+    if let activeModel { required.append(activeModel.language + ".gram") }
+    if let rimeIce { required.append(contentsOf: rimeIce.files.map(\.path)) }
     for name in required where !manager.fileExists(atPath: directory.appendingPathComponent(name).path) {
       throw SettingsError.invalid("缺少已启用的文件：\(name)，请重新导入。")
     }
