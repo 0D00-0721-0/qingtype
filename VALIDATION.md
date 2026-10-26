@@ -1,9 +1,43 @@
-# Local validation — 2026-10-26 — QingType 0.2.2
+# Local validation — 2026-10-27 — QingType 0.3.0
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+
+## Phase 0 / Phase 1 — 0.3.0 (2026-10-27)
+
+The user's roadmap is in ROADMAP.md; repository guidance and current handoff are
+AGENTS.md / PROGRESS.md. BASELINE.md records the starting 0.2.2 toolchain,
+verification scope, installation/recovery behavior and remaining release gaps.
+`python3 scripts/capture-baseline.py` generates the actual runtime/toolchain and
+binary-digest report in ignored build/baseline.json without word-entry contents.
+
+The personal dictionary now has native settings UI for CRUD, weight, search and
+sorting. CSV/TSV/TXT import first previews row results, then applies an explicit
+conflict policy. Exports and complete inspection reports use native save dialogs.
+The new settings field migrates from earlier JSON and generates an owned Rime
+personal table, used by the existing full-pinyin and Xiaohe schemas.
+
+The apply lifecycle stops the input service before saving. It snapshots only
+managed configuration, deploys, and restores/recompiles the previous configuration
+if deployment fails. External edits stop rollback instead of being overwritten;
+failed recovery keeps the service stopped and reports the backup location.
+Explicit schema compilation is required: an old usable compiled table must not
+mask a failed dictionary build.
+
+116 internal checks passed: the original 61 plus 35 personal data/import/export/
+transaction checks and 20 actual engine integration checks. The latter exercise
+new word selection and exact commit, changed spelling and weights, CSV round-trip,
+Xiaohe, restart, deletion, explicit compile failure and recovery. Their fixed-source
+CRUD fixture disables the user dictionary so an intentionally learned copy cannot
+masquerade as a fixed row. This does not validate Phase 2 learning behavior.
+
+The native page and editor were inspected through accessibility and a screenshot;
+empty input produced a validation message and cancelling left the saved data
+unchanged. Version 0.3.0 was installed and read back in the About UI; settings.json
+was byte-identical before/after installation. The user deferred real-keyboard
+acceptance, so user-application entry creation and input remain unverified. Do not mark Phase 1 fully accepted from internal tests alone.
 
 ## 0.2.2 Safari input-source selection
 

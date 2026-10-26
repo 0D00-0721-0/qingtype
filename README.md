@@ -1,7 +1,7 @@
 # 清言输入法 · QingType
 
 基于 Rime 与鼠须管的开源 macOS 输入法。目标是用 Mac 原生界面完成日常输入、
-自定义词库添加及万象等本地语言模型管理。当前为 **0.2.2 开发原型**，GPL-3.0。
+自定义词库添加及万象等本地语言模型管理。当前为 **0.3.0 开发原型**，GPL-3.0。
 
 ## 使用
 
@@ -15,7 +15,10 @@
 - **外观**：单行、右侧箭头与展开网格使用同一个非激活 AppKit 窗口；
   支持横排／竖排与字号。展开态按原生参考调整为小编号、对齐的文字、浅灰背景，
   按用户要求不显示底部工具栏。右上角箭头或 Esc 可收起。
-- **词库**：导入 `.dict.yaml`，支持同一文件夹内通过 `import_tables` 引用的依赖。
+- **个人词库**：词语、拼音、词频的新增、编辑、删除、搜索、排序和重复校验；
+  CSV／TSV／TXT 预检、错误行报告、冲突策略及导出。点击“保存并应用”后编译生效。
+  [使用格式与验收](docs/PERSONAL_DICTIONARY.md)。
+- **导入词库**：导入 `.dict.yaml`，支持同一文件夹内通过 `import_tables` 引用的依赖。
   选中要启用的词库，再点“保存并应用”。
 - **语言模型**：导入 Rime `.gram`，或从已有 Rime 数据目录复制万象模型。
   选择模型后“保存并应用”，界面会显示实际的编译与模型加载结果。
@@ -36,8 +39,10 @@
 加载成功不代表已证明整句准确率提高；效果仍需在实际语料中比较。
 
 设置应用管理 `settings.json`、`default.custom.yaml`、`squirrel.custom.yaml`、
-`custom_phrase.txt`、`qingtype_main.dict.yaml` 和三个方案的 `.custom.yaml`。
+`custom_phrase.txt`、`qingtype_main.dict.yaml`、`qingtype_personal.dict.yaml` 和三个方案的 `.custom.yaml`。
 保存前验证所有内容并备份上一份配置；手动维护的同名文件不会直接覆盖。
+部署失败时恢复旧配置并验证恢复后的编译；恢复失败或检测到并发手工修改时，保留备份并明确报告。
+删除固定个人词条不会删除 Rime 学习记录，已学过的同名词仍可能出现在候选中。
 固定词库和模型的导入记录存于设置中，Rime 学习词频仍由用户词库数据库管理。
 
 ## 本机开发
@@ -66,7 +71,9 @@ open "build/QingType.app/Contents/Applications/QingType Settings.app"
 
 ## 验证与后续
 
-详见 `VALIDATION.md`。目前已验证词库导入、全拼／双拼挂载、模型实际加载、
+项目长期目标见 [AGENTS.md](AGENTS.md)，阶段验收见 [ROADMAP.md](ROADMAP.md)，当前交接进度见 [PROGRESS.md](PROGRESS.md)，基线见 [BASELINE.md](BASELINE.md)。
+
+详见 `VALIDATION.md`。目前已验证个人词库 CRUD 与文本导入导出、词库导入、全拼／双拼挂载、模型实际加载、
 数据保护和设置迁移。用户已确认基本真实键盘输入。
 
 仍需完成浏览器、微信、Word、VS Code、终端、多显示器和长时间使用测试，

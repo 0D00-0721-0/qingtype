@@ -9,7 +9,7 @@ enum DeploymentService {
   }
 
   @MainActor
-  static func deploy() async throws -> QingTypeDeploymentReport {
+  static func apply(_ settings: QingTypeSettings) async throws -> QingTypeDeploymentReport {
     let running = NSRunningApplication.runningApplications(withBundleIdentifier: "org.qingtype.inputmethod.QingType")
     for app in running { app.terminate() }
     for _ in 0..<40 {
@@ -20,13 +20,25 @@ enum DeploymentService {
       throw SettingsError.invalid("输入法尚未退出，请结束当前输入后重新应用。")
     }
     let appURL = inputMethodURL()
+    var shouldRestart = true
     defer {
-      if !running.isEmpty {
+      if shouldRestart && !running.isEmpty {
         let config = NSWorkspace.OpenConfiguration()
         config.activates = false
         NSWorkspace.shared.openApplication(at: appURL, configuration: config, completionHandler: nil)
       }
     }
+    do {
+      return try await QingTypeConfigurationApply.apply(settings, to: QingTypePaths.userDirectory) {
+        try await runWorker(appURL: appURL)
+      }
+    } catch {
+      if let failure = error as? QingTypeApplyError { shouldRestart = failure.recoveryVerified }
+      throw error
+    }
+  }
+
+  private static func runWorker(appURL: URL) async throws -> QingTypeDeploymentReport {
     let result = try await Task.detached {
       let task = Process()
       task.executableURL = appURL.appendingPathComponent("Contents/MacOS/QingType")

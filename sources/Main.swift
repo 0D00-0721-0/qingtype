@@ -26,6 +26,9 @@ struct SquirrelApp {
       if CommandLine.arguments.contains("--candidate-ui-test") {
         return QingTypeDiagnostics.runCandidateTests()
       }
+      if CommandLine.arguments.contains("--personal-dictionary-engine-test") {
+        return QingTypePersonalDictionaryDiagnostics.run(api: rimeAPI)
+      }
       if CommandLine.arguments.contains("--preview-system") {
         QingTypeDiagnostics.showSystemPreview()
         return true
@@ -74,6 +77,9 @@ struct SquirrelApp {
         case "--status":
           let report: [String: Any] = [
             "bundle": Bundle.main.bundleIdentifier ?? "", "userDirectory": userDir.path,
+            "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
+            "rimeVersion": rimeAPI.get_version().map { String(cString: $0) } ?? "unknown",
+            "connectionName": Bundle.main.object(forInfoDictionaryKey: "InputMethodConnectionName") as? String ?? "",
             "controllerClassFound": NSClassFromString("QingType.QingTypeInputController") != nil,
             "inputSources": installer.status()
           ]

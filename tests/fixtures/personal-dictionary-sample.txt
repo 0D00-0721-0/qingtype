@@ -1,0 +1,3 @@
+text	pinyin	weight
+清言星河样词	qing yan xing he yang ci	50000
+校园信息安全	xiao yuan xin xi an quan	1000

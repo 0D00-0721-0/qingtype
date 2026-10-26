@@ -21,6 +21,7 @@ struct QingTypeSettings: Codable, Equatable {
   var inlinePreedit = true
   var useShift = true
   var phrases: [QuickPhrase] = []
+  var personalWords: [PersonalWord] = []
   var useSystemCandidates = true
   var dictionaries: [DictionaryAsset] = []
   var models: [GrammarAsset] = []
@@ -31,7 +32,7 @@ struct QingTypeSettings: Codable, Equatable {
   init() {}
 
   enum CodingKeys: String, CodingKey {
-    case schema, layout, fontSize, pageSize, inlinePreedit, useShift, phrases
+    case schema, layout, fontSize, pageSize, inlinePreedit, useShift, phrases, personalWords
     case useSystemCandidates, dictionaries, models, activeModelID
   }
 
@@ -45,6 +46,7 @@ struct QingTypeSettings: Codable, Equatable {
     inlinePreedit = try values.decodeIfPresent(Bool.self, forKey: .inlinePreedit) ?? inlinePreedit
     useShift = try values.decodeIfPresent(Bool.self, forKey: .useShift) ?? useShift
     phrases = try values.decodeIfPresent([QuickPhrase].self, forKey: .phrases) ?? []
+    personalWords = try (values.decodeIfPresent([PersonalWord].self, forKey: .personalWords) ?? []).map { try $0.normalized() }
     useSystemCandidates = try values.decodeIfPresent(Bool.self, forKey: .useSystemCandidates) ?? true
     dictionaries = try values.decodeIfPresent([DictionaryAsset].self, forKey: .dictionaries) ?? []
     models = try values.decodeIfPresent([GrammarAsset].self, forKey: .models) ?? []
@@ -62,13 +64,15 @@ struct QingTypeSettings: Codable, Equatable {
   static func ensureInitialConfiguration() throws {
     let directory = QingTypePaths.userDirectory
     let settings = try load(from: directory)
-    let files = ["settings.json", "default.custom.yaml", "squirrel.custom.yaml", "custom_phrase.txt", "qingtype_main.dict.yaml"]
+    let files = ["settings.json", "default.custom.yaml", "squirrel.custom.yaml", "custom_phrase.txt", "qingtype_main.dict.yaml"] +
+      (settings.personalWords.isEmpty ? [] : [QingTypePersonalDictionary.tableName + ".dict.yaml"])
     if files.contains(where: { !FileManager.default.fileExists(atPath: directory.appendingPathComponent($0).path) }) {
       try settings.save(to: directory)
     }
   }
 
   func validate() throws {
+    try QingTypePersonalDictionary.validate(personalWords)
     guard ["luna_pinyin_simp", "luna_pinyin", "qingtype_double_pinyin"].contains(schema),
           ["linear", "stacked"].contains(layout), (12...32).contains(fontSize),
           (3...9).contains(pageSize) else {
@@ -147,7 +151,8 @@ struct QingTypeSettings: Codable, Equatable {
             "default.custom.yaml": Data(defaults.utf8),
             "squirrel.custom.yaml": Data(appearance.utf8),
             "custom_phrase.txt": Data(phraseText.utf8)]
-    let tables = ["luna_pinyin"] + dictionaries.filter(\.enabled).flatMap(\.tables)
+    files[QingTypePersonalDictionary.tableName + ".dict.yaml"] = try QingTypePersonalDictionary.dictionaryData(personalWords)
+    let tables = ["luna_pinyin"] + (personalWords.isEmpty ? [] : [QingTypePersonalDictionary.tableName]) + dictionaries.filter(\.enabled).flatMap(\.tables)
     let dictionary: [String: Any] = ["name": "qingtype_main", "version": "0.2", "sort": "by_weight",
                                      "use_preset_vocabulary": true, "import_tables": tables]
     files["qingtype_main.dict.yaml"] = Data((Self.managedHeader + "---\n" + (try Yams.dump(object: dictionary)) + "...\n").utf8)

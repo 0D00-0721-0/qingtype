@@ -16,6 +16,10 @@ enum QingTypeMaintenance {
     api.initialize(nil)
     defer { api.finalize() }
     if api.start_maintenance(true) { api.join_maintenance_thread() }
+    // A stale compiled table can still answer nihao after a failed rebuild.
+    // Require the explicit schema/dictionary compiler result as well.
+    let schemaFile = URL(fileURLWithPath: Bundle.main.sharedSupportPath!).appendingPathComponent(settings.schema + ".schema.yaml")
+    let schemaReady = api.deploy_schema(schemaFile.path)
     let configReady = api.deploy_config_file("squirrel.yaml", "config_version")
     let session = api.create_session()
     defer { _ = api.destroy_session(session) }
@@ -42,7 +46,7 @@ enum QingTypeMaintenance {
     let dictionary = translator?["dictionary"] as? String ?? ""
     let binaryReady = FileManager.default.fileExists(atPath: directory.appendingPathComponent("build/\(prism).prism.bin").path) &&
       FileManager.default.fileExists(atPath: directory.appendingPathComponent("build/qingtype_main.table.bin").path)
-    let success = configReady && selected && hasCandidates && binaryReady && dictionary == "qingtype_main"
+    let success = schemaReady && configReady && selected && hasCandidates && binaryReady && dictionary == "qingtype_main"
     return QingTypeDeploymentReport(success: success,
       settingsHash: try QingTypeContent.digest(of: directory.appendingPathComponent("settings.json")),
       schema: settings.schema, dictionaryCount: settings.dictionaries.filter(\.enabled).count,

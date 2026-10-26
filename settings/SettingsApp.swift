@@ -45,23 +45,26 @@ final class SettingsModel: ObservableObject {
   }
 
   func save() {
-    guard !busy else { return }
-    do {
-      try settings.save()
-      saved = settings
-      busy = true
-      failed = false
-      message = "正在编译词库并检查语言模型…"
-      Task {
-        defer { busy = false }
-        do {
-          let report = try await DeploymentService.deploy()
-          deployment = report
-          failed = !report.success
-          message = report.message
-        } catch { failed = true; message = "设置已保存，部署失败：\(error.localizedDescription)" }
+    guard !busy, !loadFailed else { return }
+    let draft = settings
+    do { try draft.validate() }
+    catch { failed = true; message = error.localizedDescription; return }
+    busy = true
+    failed = false
+    message = "正在编译词库并检查语言模型…"
+    Task {
+      defer { busy = false }
+      do {
+        let report = try await DeploymentService.apply(draft)
+        saved = draft
+        deployment = report
+        message = report.message
+      } catch {
+        failed = true
+        message = error.localizedDescription
+        if let restored = try? QingTypeSettings.load() { saved = restored }
       }
-    } catch { failed = true; message = error.localizedDescription }
+    }
   }
 
   func chooseImport(model: Bool) {
@@ -129,12 +132,13 @@ final class SettingsModel: ObservableObject {
 }
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-  case input = "输入", appearance = "外观", dictionaries = "词库", models = "语言模型", phrases = "快捷短语", about = "关于与安装"
+  case input = "输入", appearance = "外观", personal = "个人词库", dictionaries = "导入词库", models = "语言模型", phrases = "快捷短语", about = "关于与安装"
   var id: String { rawValue }
   var icon: String {
     switch self {
     case .input: return "keyboard"
     case .appearance: return "textformat.size"
+    case .personal: return "text.book.closed"
     case .dictionaries: return "books.vertical"
     case .models: return "brain"
     case .phrases: return "text.bubble"
@@ -175,6 +179,7 @@ struct SettingsView: View {
             switch section ?? .input {
             case .input: inputPage
             case .appearance: appearancePage
+            case .personal: PersonalDictionaryPage(model: model)
             case .dictionaries: dictionariesPage
             case .models: modelsPage
             case .phrases: phrasesPage
@@ -210,6 +215,7 @@ struct SettingsView: View {
     switch section ?? .input {
     case .input: return "选好输入习惯，安心写下每一句。"
     case .appearance: return "候选窗随系统明暗模式与高亮颜色变化。"
+    case .personal: return "管理词语、拼音和词频，保存后参与日常输入。"
     case .dictionaries: return "添加专业词与个人词库，让输入更懂你的用词。"
     case .models: return "使用万象等本地语言模型，参与整句候选排序。"
     case .phrases: return "用一小段字母，输入经常说的话。"

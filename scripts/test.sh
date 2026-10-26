@@ -7,8 +7,11 @@ yaml_flags=(-I "$yaml_build_dir" -I "$yaml_build_dir/Modules" -I dependencies/.b
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/SettingsSafetyTests.swift "${yaml_flags[@]}" -o build/settings-tests
 build/settings-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/ContentTests.swift "${yaml_flags[@]}" -o build/content-tests
+swiftc -parse-as-library -swift-version 5 shared/*.swift tests/PersonalDictionaryTests.swift "${yaml_flags[@]}" -o build/personal-dictionary-tests
+build/personal-dictionary-tests
 build/content-tests
 build/QingType.app/Contents/MacOS/QingType --engine-smoke-test
+build/QingType.app/Contents/MacOS/QingType --personal-dictionary-engine-test
 build/QingType.app/Contents/MacOS/QingType --candidate-ui-test
 python3 tests/InputSourceCacheTests.py
 build/QingType.app/Contents/MacOS/QingType --status > build/input-source-status.json
