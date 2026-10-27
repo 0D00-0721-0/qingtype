@@ -152,7 +152,7 @@ enum ProgramMaintenanceService {
       }
     }
     guard running.allSatisfy(\.isTerminated) else { try await restoreSource(); throw SettingsError.invalid("输入服务尚未退出，已停止卸载。") }
-    let profileLock: QingTypeDataLock
+    var profileLock: QingTypeDataLock?
     do { profileLock = try QingTypeDataLock(directory: QingTypePaths.userDirectory, exclusive: true) }
     catch { try await restoreSource(); throw error }
     defer { withExtendedLifetime(profileLock) {} }
@@ -182,10 +182,18 @@ enum ProgramMaintenanceService {
       return result.0[staging] ?? staging
     } catch {
       if let stagedURL {
-        do { try QingTypeProgramMaintenance.undoStagedUninstall(stagedURL, allowed: allowed); try await restoreSource() }
+        do {
+          try QingTypeProgramMaintenance.undoStagedUninstall(stagedURL, allowed: allowed)
+          // Selecting the source may immediately relaunch its service. Release
+          // the offline lock first so that service can open the restored data.
+          profileLock = nil
+          try await restoreSource()
+        }
         catch { throw SettingsError.invalid("卸载恢复未完成，请保留恢复文件夹 \(stagedURL.path)。\(error.localizedDescription)") }
+      } else {
+        profileLock = nil
+        if fm.fileExists(atPath: InstallationService.installedURL.path) { try? await restoreSource() }
       }
-      if fm.fileExists(atPath: InstallationService.installedURL.path) { try? await restoreSource() }
       throw error
     }
   }

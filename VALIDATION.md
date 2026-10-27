@@ -48,8 +48,15 @@ and bundles notices plus source commit/clean state/architecture/toolchain proven
 The official Squirrel PKG differs from the matching Rime SDK in Mach-O UUID and Lua
 patch version; SDK plugin revisions are recipe evidence, not byte-equivalence proof.
 This remaining source rebuild audit is explicit in docs/DEPENDENCIES.md.
-Multi-system Apple Silicon remote CI and native installation/UI results will be recorded
-in PROGRESS.md after completion. This machine still has zero valid signing identities.
+The 0.6.1 bfc4379 CI 40507767209 passed on macOS 14/15/26 Apple Silicon.
+Native installation preserved every setting and loaded the existing model. The
+maintenance page, default-preserve uninstall confirmation (cancelled), update
+check and native private diagnostic export were checked. Synthetic data was
+also recycled using NSWorkspace and restored byte-for-byte from its real Trash
+receipt. Real installed-program uninstall was not exercised. A final recovery
+ordering fix releases the profile lock before reselecting the restored input
+source; build, 26 maintenance and 32 learning-lock checks passed. The tagged
+release workflow will rerun full checks on all three supported systems. This machine still has zero valid signing identities.
 
 ## Rime learning, persistence and recovery — 0.5.0
 

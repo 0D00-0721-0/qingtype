@@ -63,6 +63,13 @@
 
 ## 本机开发
 
+新开发者请克隆 Git 仓库，构建脚本会获取固定的 Rime 头文件和运行库；Release 源码压缩包用于查看主项目源码。
+
+```sh
+git clone https://github.com/0D00-0721-0/qingtype.git
+cd qingtype
+```
+
 ```sh
 ./scripts/build-dev.sh
 ./scripts/test.sh
