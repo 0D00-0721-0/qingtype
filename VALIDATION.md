@@ -40,8 +40,17 @@ The rebuilt DMG passed mounting, signing-structure and offline-engine checks.
 The native installer installed/enabled 0.5.0 and verified deployment/model load;
 normal app, nested payload and installed service match. JSON comparison confirms
 all preexisting settings unchanged, with only default learningEnabled added.
-Actual page inspection, production backup UI and pushed-head CI are pending at
-this checkpoint; real application learning remains separate manual acceptance.
+The installed welcome page reads 0.5.0 and the learning page was inspected in AX
+and a screenshot. The real backup button created one backup of both existing
+databases; digest, 0600 file and 0700 folder permissions passed readback. The
+privacy-clear confirmation was opened and cancelled, with databases, backup and
+preferences preserved. Destructive actions were not tested on real user data.
+Source e618c79 passed [CI 40475012326](https://github.com/0D00-0721-0/qingtype/actions/runs/40475012326),
+including the complete 287-check suite and mounted-DMG inspection. The user then
+performed the Safari same-pinyin/repeated-lower-candidate test, saved/applied
+settings and tested again, explicitly confirming that ranking advanced and
+remained after reapplication. This accepts learning and deployment persistence
+in that real application scenario; other apps remain in the compatibility matrix.
 See docs/LEARNING.md and ignored build/phase2-*.log for reproducible evidence.
 
 ## Expanded long-candidate layout — 0.4.2
