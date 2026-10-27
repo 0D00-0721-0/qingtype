@@ -25,17 +25,22 @@ load while preserving all settings. The user profile's font was then changed
 through the appearance page and saved successfully. A structured comparison
 confirms fontSize 18 -> 16 is the only settings change, with pageSize still 7;
 deployment reports success=true and modelVerified=true. Both installed app
-versions read back as 0.4.1. Actual typing, caret attachment and expansion remain
-pending user confirmation. The existing 0.4.0 GitHub preview assets are unchanged.
+versions read back as 0.4.1. The user then followed the same-field, manual-ni
+comparison and confirmed that position and size are both close to native. The
+user also confirmed same-window expansion and successful mouse-selected commit
+to the original input field. This accepts those interactions in that scenario;
+other applications, personal-dictionary workflows and schema switching remain
+separate acceptance items. The existing 0.4.0 GitHub preview assets are unchanged.
 
 Evidence: build/native-geometry-{build,tests,package,distribution,install}.log and
-build/native-geometry-row.png (ignored local files). Pushed-head CI must be read
-back separately; local success is not a remote CI result.
+build/native-geometry-row.png (ignored local files).
 
 The first geometry CI (40466635055) passed the engine checks but detected a
 fractional-metric overlap between the last expanded column and the chevron.
 Grid columns now use whole-point boundaries; the same 18 interaction checks and
-rebuilt distribution checks pass locally. A new remote run is still required.
+rebuilt distribution checks pass locally. Corrected source aca38e6 passed
+[CI 40467256898](https://github.com/0D00-0721-0/qingtype/actions/runs/40467256898),
+including the clean build, complete test suite and mounted-DMG checks.
 
 ## Installable preview and optional components — 0.4.0
 
