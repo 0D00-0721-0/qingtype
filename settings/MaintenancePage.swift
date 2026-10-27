@@ -6,7 +6,7 @@ struct MaintenancePage: View {
   @ObservedObject var model: SettingsModel
   @State private var confirmUpdate = false
   @State private var confirmUninstall = false
-  @State private var removeData = false
+  @State private var confirmRemoveData = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
@@ -34,11 +34,18 @@ struct MaintenancePage: View {
         VStack(alignment: .leading, spacing: 12) {
           Text("卸载输入服务和已安装的清言应用，并退出清言。默认保留个人词库、模型、学习记录及配置，以便以后重新安装。")
             .font(.callout).foregroundStyle(.secondary)
-          Toggle("同时把用户数据移到废纸篓", isOn: $removeData)
           Text("移除的文件会放在同一个恢复文件夹中，可从废纸篓找回。请先完成当前输入。")
             .font(.caption).foregroundStyle(.secondary)
           Button("卸载清言…", role: .destructive) { confirmUninstall = true }
             .disabled(model.busy || model.isDirty)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
+      }
+      GroupBox("单独删除用户数据") {
+        VStack(alignment: .leading, spacing: 12) {
+          Text("请先卸载输入法，再从安装包打开清言。此操作会将个人词库、配置、模型、学习记录和本地备份全部移到废纸篓，不会自动清空废纸篓。")
+            .font(.callout).foregroundStyle(.secondary)
+          Button("删除清言用户数据…", role: .destructive) { confirmRemoveData = true }
+            .disabled(model.busy || model.isDirty || model.installedVersion != nil)
         }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
       }
       GroupBox("诊断与反馈") {
@@ -57,9 +64,15 @@ struct MaintenancePage: View {
     } message: { Text("旧程序会先备份。个人词库、模型和学习记录保留；请先完成当前输入。") }
     .alert("卸载清言并退出？", isPresented: $confirmUninstall) {
       Button("取消", role: .cancel) {}
-      Button("卸载", role: .destructive) { model.uninstallQingType(removeUserData: removeData) }
+      Button("卸载", role: .destructive) { model.uninstallQingType() }
     } message: {
-      Text(removeData ? "程序、配置、个人词库、模型和学习记录都会移到废纸篓中的恢复文件夹。" : "程序将移到废纸篓，用户数据保留在 ~/Library/QingType。")
+      Text("程序将移到废纸篓，用户数据保留在 ~/Library/QingType。")
+    }
+    .alert("删除全部清言用户数据？", isPresented: $confirmRemoveData) {
+      Button("取消", role: .cancel) {}
+      Button("移到废纸篓", role: .destructive) { model.removeQingTypeUserData() }
+    } message: {
+      Text("个人词库、模型、配置、学习记录和本地备份都会移到废纸篓。清空废纸篓后无法通过清言恢复。")
     }
   }
 }
@@ -141,12 +154,23 @@ extension SettingsModel {
     }
   }
 
-  func uninstallQingType(removeUserData: Bool) {
+  func uninstallQingType() {
     guard !busy, !isDirty else { return }
     busy = true; failed = false; message = "正在安全卸载清言…"
     Task {
       do {
-        _ = try await ProgramMaintenanceService.uninstall(removeUserData: removeUserData)
+        _ = try await ProgramMaintenanceService.uninstall()
+        NSApplication.shared.terminate(nil)
+      } catch { busy = false; failed = true; message = error.localizedDescription; refreshInstallation() }
+    }
+  }
+
+  func removeQingTypeUserData() {
+    guard !busy, !isDirty else { return }
+    busy = true; failed = false; message = "正在移除清言用户数据…"
+    Task {
+      do {
+        _ = try await ProgramMaintenanceService.removeUserData()
         NSApplication.shared.terminate(nil)
       } catch { busy = false; failed = true; message = error.localizedDescription; refreshInstallation() }
     }

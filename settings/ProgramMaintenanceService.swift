@@ -115,31 +115,31 @@ enum ProgramMaintenanceService {
   }
 
   @MainActor
-  static func uninstall(removeUserData: Bool) async throws -> URL {
+  static func uninstall() async throws -> URL {
     try QingTypePaths.checkDirectory(QingTypePaths.userDirectory)
     let fm = FileManager.default
     let control = InstallationService.payload ?? InstallationService.installedURL
     guard try QingTypeAppInstallation.version(at: control).compare("0.6.0", options: .numeric) != .orderedAscending else {
       throw SettingsError.invalid("请从新版完整清言应用执行卸载。")
     }
-    let allowed = [InstallationService.installedURL] + applications + [QingTypePaths.userDirectory]
-    let items = allowed.filter { fm.fileExists(atPath: $0.path) && ($0 != QingTypePaths.userDirectory || removeUserData) }.map { url -> QingTypeUninstallItem in
-      .init(url: url, kind: url == QingTypePaths.userDirectory ? nil : url == InstallationService.installedURL ? .inputService : .application)
+    try await QingTypeUninstallTransaction.checkControl(control)
+    let allowed = [InstallationService.installedURL] + applications
+    let items = allowed.filter { fm.fileExists(atPath: $0.path) }.map { url -> QingTypeUninstallItem in
+      .init(url: url, kind: url == InstallationService.installedURL ? .inputService : .application)
     }
     guard !items.isEmpty else { throw SettingsError.invalid("没有找到已安装的清言。") }
     for item in items { if let kind = item.kind { _ = try QingTypeProgramMaintenance.version(at: item.url, kind: kind) } }
+    let installLock = try QingTypeInstallLock(destination: InstallationService.installedURL)
+    defer { withExtendedLifetime(installLock) {} }
     let lock = try QingTypeDataLock(directory: directory, exclusive: true)
     defer { withExtendedLifetime(lock) {} }
     guard !fm.fileExists(atPath: receiptURL.path) else { throw SettingsError.invalid("请先完成上一次程序更新，再卸载。") }
-    let others = NSRunningApplication.runningApplications(withBundleIdentifier: "org.qingtype.app").filter { $0.processIdentifier != getpid() }
-    others.forEach { $0.terminate() }
-    let previous = try JSONDecoder().decode(QingTypeInputSourceState.self, from: await InstallationService.command(["--prepare-uninstall"], app: control))
-    let running = NSRunningApplication.runningApplications(withBundleIdentifier: QingTypeAppInstallation.bundleID).filter { $0.processIdentifier != getpid() }
-    running.forEach { $0.terminate() }
-    for _ in 0..<40 {
-      if running.allSatisfy(\.isTerminated) { break }
-      try await Task.sleep(nanoseconds: 100_000_000)
-    }
+    let others = ["org.qingtype.app", "org.qingtype.settings"].flatMap {
+      NSRunningApplication.runningApplications(withBundleIdentifier: $0)
+    }.filter { $0.processIdentifier != getpid() && !$0.isTerminated }
+    guard others.isEmpty else { throw SettingsError.invalid("请先退出其他清言设置窗口，卸载已停止。") }
+    let previous = try await QingTypeInstallationSession.state(app: control)
+    _ = try await InstallationService.command(["--prepare-uninstall"], app: control)
     func restoreSource() async throws {
       if fm.fileExists(atPath: InstallationService.installedURL.path) { _ = try await InstallationService.command(["--register-input-source"]) }
       let enabled = previous.inputSources.filter { $0.enabled == true }.map(\.id).joined(separator: ",")
@@ -147,18 +147,48 @@ enum ProgramMaintenanceService {
       _ = try await InstallationService.command(["--restore-uninstall-source", enabled, selected], app: control)
       let state = try JSONDecoder().decode(QingTypeInputSourceState.self, from: await InstallationService.command(["--status"], app: control))
       let expected = Set(previous.inputSources.filter { $0.enabled == true }.map(\.id))
-      guard Set(state.inputSources.filter { $0.enabled == true }.map(\.id)) == expected else {
+      let selectedID = previous.inputSources.first { $0.selected == true }?.id
+      guard Set(state.inputSources.filter { $0.enabled == true }.map(\.id)) == expected,
+            state.inputSources.first(where: { $0.selected == true })?.id == selectedID else {
         throw SettingsError.invalid("程序已恢复，输入源需在系统键盘设置中重新添加。")
       }
     }
-    guard running.allSatisfy(\.isTerminated) else { try await restoreSource(); throw SettingsError.invalid("输入服务尚未退出，已停止卸载。") }
+    do { _ = try await InstallationService.command(["--verify-uninstall"], app: control) }
+    catch {
+      let reason = error.localizedDescription
+      do { try await restoreSource() }
+      catch { throw SettingsError.invalid("卸载已停止，输入源恢复未确认：\(reason)；\(error.localizedDescription)") }
+      throw SettingsError.invalid("卸载已停止，输入源已恢复：\(reason)")
+    }
+    let running = NSRunningApplication.runningApplications(withBundleIdentifier: QingTypeAppInstallation.bundleID).filter { $0.processIdentifier != getpid() }
+    running.forEach { $0.terminate() }
+    for _ in 0..<40 {
+      if running.allSatisfy(\.isTerminated) { break }
+      do { try await Task.sleep(nanoseconds: 100_000_000) }
+      catch {
+        do { try await restoreSource() }
+        catch { throw SettingsError.invalid("卸载已停止，输入源恢复未确认：\(error.localizedDescription)") }
+        throw SettingsError.invalid("卸载已取消，原输入源已恢复。")
+      }
+    }
+    guard running.allSatisfy(\.isTerminated) else {
+      do { try await restoreSource() }
+      catch { throw SettingsError.invalid("输入服务尚未退出，输入源恢复未确认：\(error.localizedDescription)") }
+      throw SettingsError.invalid("输入服务尚未退出，已停止卸载并恢复输入源。")
+    }
     var profileLock: QingTypeDataLock?
     do { profileLock = try QingTypeDataLock(directory: QingTypePaths.userDirectory, exclusive: true) }
-    catch { try await restoreSource(); throw error }
+    catch {
+      let reason = error.localizedDescription
+      do { try await restoreSource() }
+      catch { throw SettingsError.invalid("卸载已停止，输入源恢复未确认：\(reason)；\(error.localizedDescription)") }
+      throw SettingsError.invalid("卸载已停止，输入源已恢复：\(reason)")
+    }
     defer { withExtendedLifetime(profileLock) {} }
     let staging = QingTypePaths.userDirectory.deletingLastPathComponent().appendingPathComponent("清言卸载备份-\(UUID())")
     var stagedURL: URL?
     do {
+      _ = try await InstallationService.command(["--verify-uninstall"], app: control)
       _ = try QingTypeProgramMaintenance.stageUninstall(items: items, allowed: allowed, userData: QingTypePaths.userDirectory, staging: staging)
       stagedURL = staging
       // As during installation, stale per-app keyboard tables can retain a
@@ -192,9 +222,49 @@ enum ProgramMaintenanceService {
         catch { throw SettingsError.invalid("卸载恢复未完成，请保留恢复文件夹 \(stagedURL.path)。\(error.localizedDescription)") }
       } else {
         profileLock = nil
-        if fm.fileExists(atPath: InstallationService.installedURL.path) { try? await restoreSource() }
+        if fm.fileExists(atPath: InstallationService.installedURL.path) {
+          do { try await restoreSource() }
+          catch { throw SettingsError.invalid("卸载已停止，输入源恢复未确认：\(error.localizedDescription)") }
+        }
       }
       throw error
     }
+  }
+
+  @MainActor
+  static func removeUserData() async throws -> URL {
+    let fm = FileManager.default
+    let data = QingTypePaths.userDirectory
+    guard !fm.fileExists(atPath: InstallationService.installedURL.path),
+          NSRunningApplication.runningApplications(withBundleIdentifier: QingTypeAppInstallation.bundleID).isEmpty else {
+      throw SettingsError.invalid("请先卸载清言输入法并退出输入服务，再删除用户数据。")
+    }
+    guard fm.fileExists(atPath: data.path) else { throw SettingsError.invalid("没有找到清言用户数据。") }
+    try QingTypePaths.checkDirectory(data)
+    let installLock = try QingTypeInstallLock(destination: InstallationService.installedURL)
+    defer { withExtendedLifetime(installLock) {} }
+    let otherSettings = ["org.qingtype.app", "org.qingtype.settings"].flatMap {
+      NSRunningApplication.runningApplications(withBundleIdentifier: $0)
+    }.filter { $0.processIdentifier != getpid() && !$0.isTerminated }
+    try QingTypeUninstallGuard.requireDataRemovalSafe(installed: fm.fileExists(atPath: InstallationService.installedURL.path),
+      running: !NSRunningApplication.runningApplications(withBundleIdentifier: QingTypeAppInstallation.bundleID).isEmpty,
+      otherSettings: !otherSettings.isEmpty)
+    guard let control = InstallationService.payload else { throw SettingsError.invalid("请从完整清言安装包打开此操作。") }
+    try await QingTypeUninstallTransaction.checkControl(control)
+    _ = try await InstallationService.command(["--verify-uninstall"], app: control)
+    let dataLock = try QingTypeDataLock(directory: data, exclusive: true)
+    defer { withExtendedLifetime(dataLock) {} }
+    let staging = data.deletingLastPathComponent().appendingPathComponent("清言数据恢复-\(UUID())")
+    _ = try QingTypeProgramMaintenance.stageUninstall(items: [.init(url: data, kind: nil)], allowed: [data], userData: data, staging: staging)
+    let result: ([URL: URL], Error?) = await withCheckedContinuation { continuation in
+      NSWorkspace.shared.recycle([staging]) { locations, error in continuation.resume(returning: (locations, error)) }
+    }
+    if let error = result.1 {
+      let actual = fm.fileExists(atPath: staging.path) ? staging : result.0[staging] ?? staging
+      do { try QingTypeProgramMaintenance.undoStagedUninstall(actual, allowed: [data]) }
+      catch { throw SettingsError.invalid("用户数据恢复未完成，请保留恢复文件夹 \(actual.path)：\(error.localizedDescription)") }
+      throw SettingsError.invalid("无法移到废纸篓，用户数据已恢复：\(error.localizedDescription)")
+    }
+    return result.0[staging] ?? staging
   }
 }

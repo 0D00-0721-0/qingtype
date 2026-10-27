@@ -1,11 +1,9 @@
 #!/bin/bash
 set -euo pipefail
-destination="$HOME/Library/Input Methods/QingType.app"
-if [[ -x "$destination/Contents/MacOS/QingType" ]]; then
-  "$destination/Contents/MacOS/QingType" --disable-input-source
-  "$destination/Contents/MacOS/QingType" --quit
-  # Move to Trash so the development installation can be recovered.
-  mkdir -p "$HOME/.Trash"
-  mv "$destination" "$HOME/.Trash/QingType-$(date +%Y%m%d-%H%M%S).app"
-fi
-echo "已移走清言输入法程序。配置与词库保留在 ~/Library/QingType。"
+cd "$(dirname "$0")/.."
+[[ -x build/QingType.app/Contents/MacOS/QingType ]] || { echo "请先运行 scripts/build-dev.sh，以使用安全卸载控制程序。" >&2; exit 1; }
+yaml_build_dir=$(swift build --package-path dependencies -c release --show-bin-path)
+swiftc -parse-as-library -swift-version 5 shared/*.swift scripts/UninstallDev.swift \
+  -I "$yaml_build_dir" -I "$yaml_build_dir/Modules" -I dependencies/.build/checkouts/Yams/Sources/CYaml/include \
+  -L "$yaml_build_dir" -lQingTypeYAML -o build/qingtype-uninstall-dev
+exec build/qingtype-uninstall-dev

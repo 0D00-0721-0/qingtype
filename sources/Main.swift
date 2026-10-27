@@ -118,6 +118,10 @@ struct SquirrelApp {
             print(String(decoding: try JSONSerialization.data(withJSONObject: ["inputSources": previous]), as: UTF8.self))
           } catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
           return true
+        case "--verify-uninstall":
+          do { try QingTypeUninstallGuard.verify(installer.uninstallSnapshot()) }
+          catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
+          return true
         case "--restore-uninstall-source":
           guard args.count >= 3 else { exit(1) }
           let modes = args[2].split(separator: ",").compactMap { SquirrelInstaller.InputMode(rawValue: String($0)) }
@@ -168,14 +172,15 @@ struct SquirrelApp {
           installer.enable()
           return true
         case "--disable-input-source":
-          if args.count > 2 {
-            let modes = args[2...].map { SquirrelInstaller.InputMode(rawValue: $0) }.compactMap { $0 }
-            if !modes.isEmpty {
-              installer.disable(modes: modes)
+          do {
+            if args.count > 2 {
+              try QingTypeUninstallGuard.validateModeIDs(Array(args[2...]), valid: Set(SquirrelInstaller.InputMode.allCases.map(\.rawValue)))
+              let modes = args[2...].map { SquirrelInstaller.InputMode(rawValue: $0) }.compactMap { $0 }
+              try installer.disable(modes: modes)
               return true
             }
-          }
-          installer.disable()
+            try installer.disable()
+          } catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
           return true
         case "--select-input-source":
           if args.count > 2, let mode = SquirrelInstaller.InputMode(rawValue: args[2]) {
@@ -281,5 +286,6 @@ Install QingType:
   --enable-input-source [source id...]  input source list optional
   --disable-input-source [source id...] input source list optional
   --select-input-source [source id]     input source optional
+  --prepare-uninstall, --verify-uninstall  safely deactivate and verify the input source
 """
 }

@@ -17,6 +17,8 @@ swiftc -parse-as-library -swift-version 5 shared/*.swift tests/SetupTests.swift 
 build/setup-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/InstallationTransactionTests.swift "${yaml_flags[@]}" -o build/installation-transaction-tests
 build/installation-transaction-tests
+swiftc -parse-as-library -swift-version 5 shared/*.swift tests/UninstallSafetyTests.swift "${yaml_flags[@]}" -o build/uninstall-safety-tests
+build/uninstall-safety-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/WanxiangUpdateTests.swift "${yaml_flags[@]}" -o build/wanxiang-update-tests
 build/wanxiang-update-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/MetadataRequestTests.swift "${yaml_flags[@]}" -o build/metadata-request-tests

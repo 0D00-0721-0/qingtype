@@ -101,51 +101,64 @@ final class SquirrelInstaller {
     }
   }
 
-  func disable(modes: [InputMode] = []) {
+  func disable(modes: [InputMode] = []) throws {
     let modesToDisable = modes.isEmpty ? InputMode.allCases : modes
     for (mode, inputSource) in getInputSource(modes: modesToDisable) {
-      if let enabled = getBool(for: inputSource, key: kTISPropertyInputSourceIsEnabled), enabled {
+      guard let enabled = getBool(for: inputSource, key: kTISPropertyInputSourceIsEnabled) else {
+        throw SettingsError.invalid("无法确认输入源状态：\(mode.rawValue)。")
+      }
+      if enabled {
         let error = TISDisableInputSource(inputSource)
-        print("Disable \(error == noErr ? "succeeds" : "fails") for input source: \(mode.rawValue)")
+        guard error == noErr else { throw SettingsError.invalid("无法停用输入源 \(mode.rawValue)（\(error)）。") }
       }
     }
   }
 
-  func prepareUninstall() throws -> [[String: Any]] {
-    let previous = status()
-    let selected = previous.first { $0["selected"] as? Bool == true }?["id"] as? String
-    func currentID() -> String? {
-      guard let input = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
-            let value = TISGetInputSourceProperty(input, kTISPropertyInputSourceID) else { return nil }
-      return unsafeBitCast(value, to: CFString.self) as String
+  private func currentID() -> String? {
+    guard let input = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
+          let value = TISGetInputSourceProperty(input, kTISPropertyInputSourceID) else { return nil }
+    return unsafeBitCast(value, to: CFString.self) as String
+  }
+
+  func uninstallSnapshot() throws -> QingTypeUninstallSnapshot {
+    let modes = try InputMode.allCases.map { mode -> QingTypeUninstallSnapshot.Mode in
+      guard let source = inputSources[mode.rawValue] else { return .init(id: mode.rawValue, registered: false, enabled: false, selected: false) }
+      guard let enabled = getBool(for: source, key: kTISPropertyInputSourceIsEnabled),
+            let selected = getBool(for: source, key: kTISPropertyInputSourceIsSelected) else {
+        throw SettingsError.invalid("无法确认输入源状态：\(mode.rawValue)。")
+      }
+      return .init(id: mode.rawValue, registered: true, enabled: enabled, selected: selected)
     }
-    guard let current = currentID() else { throw SettingsError.invalid("无法确认当前输入源，请切换到其他输入法后再卸载。") }
-    if selected != nil || current.hasPrefix("org.qingtype.") {
+    return .init(current: currentID(), modes: modes)
+  }
+
+  func prepareUninstall() throws -> [[String: Any]] {
+    let previous = try QingTypeUninstallGuard.prepare(read: uninstallSnapshot, selectFallback: {
       let candidates = inputSources.filter { id, source in
         !id.hasPrefix("org.qingtype.") && getBool(for: source, key: kTISPropertyInputSourceIsEnabled) == true &&
-          getBool(for: source, key: kTISPropertyInputSourceIsSelectCapable) == true &&
-          getBool(for: source, key: kTISPropertyInputSourceIsASCIICapable) == true
+          getBool(for: source, key: kTISPropertyInputSourceIsSelectCapable) == true
       }.sorted { left, right in
         let preferred = ["com.apple.keylayout.ABC", "com.apple.keylayout.US"]
-        return (preferred.firstIndex(of: left.key) ?? 99) < (preferred.firstIndex(of: right.key) ?? 99)
+        func rank(_ source: (key: String, value: TISInputSource)) -> Int {
+          preferred.firstIndex(of: source.key) ?? (getBool(for: source.value, key: kTISPropertyInputSourceIsASCIICapable) == true ? 2 : 3)
+        }
+        let a = rank(left), b = rank(right)
+        return a == b ? left.key < right.key : a < b
       }
       guard let fallback = candidates.first, TISSelectInputSource(fallback.value) == noErr else {
         throw SettingsError.invalid("请先切换到 ABC 等其他输入法，再卸载清言。")
       }
-      guard let changed = currentID(), !changed.hasPrefix("org.qingtype.") else {
-        throw SettingsError.invalid("系统尚未切换到其他输入法，已停止卸载。")
+    }, disable: { try disable() }, restore: { previous in
+      for mode in previous.modes where mode.enabled {
+        guard let source = inputSources[mode.id] else { throw SettingsError.invalid("原输入源已不存在。") }
+        if getBool(for: source, key: kTISPropertyInputSourceIsEnabled) != true,
+           TISEnableInputSource(source) != noErr { throw SettingsError.invalid("无法恢复原输入源。") }
       }
-    }
-    for (_, source) in getInputSource(modes: InputMode.allCases) {
-      if getBool(for: source, key: kTISPropertyInputSourceIsEnabled) == true,
-         TISDisableInputSource(source) != noErr {
-        let enabled = previous.filter { $0["enabled"] as? Bool == true }.compactMap { ($0["id"] as? String).flatMap(InputMode.init(rawValue:)) }
-        if !enabled.isEmpty { enable(modes: enabled) }
-        if let selected, let mode = InputMode(rawValue: selected) { select(mode: mode) }
-        throw SettingsError.invalid("无法停用系统输入源，已停止卸载。")
+      if let id = previous.current, id.hasPrefix(QingTypeUninstallGuard.prefix), currentID() != id {
+        guard let source = inputSources[id], TISSelectInputSource(source) == noErr else { throw SettingsError.invalid("无法恢复原选中输入源。") }
       }
-    }
-    return previous
+    })
+    return previous.modes.map { ["id": $0.id, "registered": $0.registered, "enabled": $0.enabled, "selected": $0.selected] }
   }
 
   private func getInputSource(modes: [InputMode]) -> [InputMode: TISInputSource] {
