@@ -3,6 +3,20 @@ from pathlib import Path
 import plistlib
 import subprocess
 import hashlib
+import time
+
+def detach_test_image(mount):
+    # Spotlight or other system readers may briefly retain a newly exercised
+    # read-only image after the test process exits (observed on macOS 14 CI).
+    # Retry only EBUSY, never force-detach a disk or hide another cleanup error.
+    command = ['/usr/bin/hdiutil', 'detach', '-quiet', str(mount)]
+    for attempt in range(5):
+        result = subprocess.run(command)
+        if result.returncode == 0:
+            return
+        if result.returncode != 16 or attempt == 4:
+            raise subprocess.CalledProcessError(result.returncode, command)
+        time.sleep(0.5)
 
 app = Path('build/distribution/清言.app')
 payload = app / 'Contents/Resources/InputMethod/QingType.app'
@@ -55,5 +69,5 @@ for image in images:
         binary = mounted / 'Contents/Resources/InputMethod/QingType.app/Contents/MacOS/QingType'
         subprocess.run([str(binary), '--factory-engine-test'], check=True)
     finally:
-        subprocess.run(['/usr/bin/hdiutil', 'detach', '-quiet', str(mount)], check=True)
+        detach_test_image(mount)
 print('PASS: distribution identity, minimum OS, bundled runtime, optional-data exclusion and packaged offline engine')
