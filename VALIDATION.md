@@ -43,8 +43,10 @@ native-install-040.log, factory-wanxiang-test.log, setup-ice-wanxiang-test.log,
 wanxiang-download.log and wanxiang-download-cancel.log. The new CI runs bootstrap,
 the full suite and DMG packaging/inspection; its result must be checked at the
 pushed source revision. No valid local signing identity exists (0 identities),
-so Developer ID/notarization branches are prepared but unexecuted. No public
-binary release or clean-Mac GUI/install/uninstall acceptance is claimed.
+so Developer ID/notarization branches are prepared but unexecuted. The source at
+93bb9b7 passed CI 40377756642 and was published as v0.4.0-preview.1 with the tested
+DMG and SHA-256 file. GitHub's uploaded asset digest matches the local DMG digest.
+This is a public preview, not clean-Mac GUI/install/uninstall or Apple notarization acceptance.
 
 ## Rime Ice integration — 0.3.1 (2026-10-27)
 

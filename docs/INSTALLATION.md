@@ -3,6 +3,8 @@
 0.4.0 提供正常的「清言.app」与 DMG 安装包。应用内带有输入服务、Rime 运行库、
 基础词典与全拼/小鹤方案，用户不需要预装鼠须管或运行终端命令。
 
+[GitHub 预览版下载](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.4.0-preview.1)。下载 Assets 中的 DMG，另附 SHA-256 文件。
+
 1. 打开 `QingType-0.4.0-<架构>.dmg`，将「清言.app」拖入「Applications」。
 2. 打开清言，在「开始使用」点击「安装并启用清言」。
 3. 完成后点击「切换到清言」，或从系统输入菜单选择清言。
@@ -65,7 +67,8 @@ python3 tests/DistributionTests.py
 
 默认生成的是临时签名预览包，不等于已完成 Gatekeeper 发行验收。
 本轮本机 `security find-identity -v -p codesigning` 返回 0 个有效身份，
-所以尚未执行 Developer ID 签名与 Apple 公证，也未发布公开二进制 Release。
+所以尚未执行 Developer ID 签名与 Apple 公证。未公证不阻止 GitHub 发布，当前已以预览版公开提供下载。
+GitHub 承载下载，macOS 则独立执行应用信任检查，首次打开可能出现拦截，见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)。
 
 有可用证书时，打包脚本支持按动态库→内置设置→输入服务→主应用顺序重签，
 再签 DMG。公证脚本从已配置的 Keychain profile 读取凭据，不在源码中保存账号、口令或密钥：

@@ -25,7 +25,8 @@ and GPL-3.0 license are preserved in the source and `LICENSE.txt`.
 The build does not use Squirrel's update feed. DMG preview packaging and optional
 Developer ID/notarization scripts exist; no valid identity was available locally,
 so signing with Developer ID and notarization have not been performed. There is
-no public app updater or published binary Release yet.
+no public app updater. A clearly marked, unnotarized preview is published through
+GitHub Releases; this does not represent Apple notarization or stable-release acceptance.
 
 - **Squirrel Panel**: package-manifest, schema-level grammar configuration and
   exclusive deployment lifecycle were informed by the local GPL-3.0 source of
