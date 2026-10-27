@@ -1,8 +1,36 @@
-# Local validation — 2026-10-27 — QingType 0.4.0
+# Local validation — 2026-10-27 — QingType 0.4.1
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
+
+## Native candidate geometry — 0.4.1
+
+The user's two Retina (2x) screenshots show QingType's 32 px candidate glyphs
+against Apple Pinyin's 28 px glyphs. Default font size is now 16 pt instead of
+18, with a 29 pt capsule instead of 32. Placement shifts the panel 16 pt left
+of the marked-text origin and leaves a 6 pt vertical gap; the intended alignment
+is the first candidate text, with the panel edge extending left. Horizontal
+padding and the separate chevron/divider were calibrated to the reference.
+Candidate count, ranking, dictionaries, models and single-window expansion are
+unchanged; the reference has nine candidates while the user's profile has seven.
+
+187 internal checks passed, including 18 candidate placement/interaction checks.
+The 7-candidate AppKit preview is 630 x 58 px with 28 px glyphs. The rebuilt DMG
+passed read-only mounting, signing-structure, minimum-OS, library/data-boundary
+and offline-engine checks. These checks do not prove real-host caret alignment.
+
+The native installation service installed 0.4.1 and verified deployment/model
+load while preserving all settings. The user profile's font was then changed
+through the appearance page and saved successfully. A structured comparison
+confirms fontSize 18 -> 16 is the only settings change, with pageSize still 7;
+deployment reports success=true and modelVerified=true. Both installed app
+versions read back as 0.4.1. Actual typing, caret attachment and expansion remain
+pending user confirmation. The existing 0.4.0 GitHub preview assets are unchanged.
+
+Evidence: build/native-geometry-{build,tests,package,distribution,install}.log and
+build/native-geometry-row.png (ignored local files). Pushed-head CI must be read
+back separately; local success is not a remote CI result.
 
 ## Installable preview and optional components — 0.4.0
 

@@ -16,10 +16,11 @@ enum QingTypeDiagnostics {
     let size = NSSize(width: 400, height: 150)
     let ordinary = NSRect(x: -1000, y: 500, width: 1, height: 24)
     let below = QingTypeCandidatePlacement.frame(size: size, caret: ordinary, screen: screen)
-    expect(below.maxY == ordinary.minY - 5, "candidate window is below the caret in Cocoa coordinates")
+    expect(below.maxY == ordinary.minY - 6 && below.minX == ordinary.minX - 16,
+           "candidate text, rather than the panel edge, aligns with the marked-text origin")
     let bottomCaret = NSRect(x: -20, y: 5, width: 1, height: 24)
     let above = QingTypeCandidatePlacement.frame(size: size, caret: bottomCaret, screen: screen)
-    expect(screen.contains(above) && above.minY == bottomCaret.maxY + 5, "bottom/right edge flips above and clamps on a negative-origin display")
+    expect(screen.contains(above) && above.minY == bottomCaret.maxY + 6, "bottom/right edge flips above and clamps on a negative-origin display")
     expect(!QingTypeCandidatePlacement.isUsable(.zero), "missing caret geometry cannot create a window at the screen origin")
 
     var settings = QingTypeSettings()
@@ -32,6 +33,8 @@ enum QingTypeDiagnostics {
     presenter.onSelect = { picked = $0 }
     presenter.update(candidates: values, highlighted: 100, settings: settings, caretRect: caret, composition: "ci")
     let window = presenter.window
+    expect(window.frame.height == 29 && window.frame.minX == caret.minX - 16,
+           "default native row matches the 29 pt Apple reference without changing candidate count")
     expect(!window.canBecomeKey && !window.canBecomeMain && !window.isVisible, "candidate controls do not activate or focus a host window")
     expect(window.contentView!.bounds.contains(window.toggleFrame) && !window.cellFrames.contains(where: { $0.intersects(window.toggleFrame) }),
            "collapsed chevron is inside its owner and cannot overlap candidate cells")
@@ -213,8 +216,12 @@ enum QingTypeDiagnostics {
     app.setActivationPolicy(.accessory)
     let panel = QingTypeCandidatePresenter()
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-      let settings = (try? QingTypeSettings.load()) ?? QingTypeSettings()
-      let words = ["你好", "拟好", "你", "呢", "泥", "妳", "倪", "霓", "昵", "腻", "匿", "铌"]
+      var settings = (try? QingTypeSettings.load()) ?? QingTypeSettings()
+      if let flag = CommandLine.arguments.firstIndex(of: "--preview-font"), CommandLine.arguments.count > flag + 1,
+         let size = Int(CommandLine.arguments[flag + 1]), (12...32).contains(size) { settings.fontSize = size }
+      let words = CommandLine.arguments.contains("--sample-ni")
+        ? ["你", "拟", "尼", "泥", "呢", "妳", "妮", "倪", "霓", "昵", "腻", "匿", "铌"]
+        : ["你好", "拟好", "你", "呢", "泥", "妳", "倪", "霓", "昵", "腻", "匿", "铌"]
       panel.update(candidates: words.enumerated().map { QingTypeCandidate(index: $0.offset, text: $0.element) },
                    highlighted: 0, settings: settings,
                    caretRect: NSRect(x: NSScreen.main!.frame.midX - 150, y: NSScreen.main!.frame.midY, width: 1, height: 24))

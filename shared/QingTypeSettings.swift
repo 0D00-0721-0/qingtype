@@ -16,7 +16,7 @@ struct QuickPhrase: Codable, Equatable, Identifiable {
 struct QingTypeSettings: Codable, Equatable {
   var schema = "luna_pinyin_simp"
   var layout = "linear"
-  var fontSize = 18
+  var fontSize = 16
   var pageSize = 5
   var inlinePreedit = true
   var useShift = true

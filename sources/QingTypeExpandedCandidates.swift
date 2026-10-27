@@ -9,6 +9,18 @@ private enum CandidateColors {
   }
 }
 
+// Calibrated against the supplied 2x Apple Pinyin reference: a 29 pt capsule,
+// 16 pt candidate type, and the first word aligned with the marked-text origin.
+enum QingTypeCandidateMetrics {
+  static let leading: CGFloat = 1
+  static let verticalInset: CGFloat = 0.5
+  static let textInset: CGFloat = 14
+  static let anchorOffset: CGFloat = 16
+  static let caretGap: CGFloat = 6
+  static let accessoryWidth: CGFloat = 26
+  static let chromeWidth = leading * 2 + accessoryWidth
+}
+
 // IMKTextInput's line rectangle and NSWindow frames both use Cocoa screen
 // coordinates. Never combine an IMKCandidates frame with a second window.
 enum QingTypeCandidatePlacement {
@@ -19,10 +31,10 @@ enum QingTypeCandidatePlacement {
   static func frame(size: NSSize, caret: NSRect, screen: NSRect) -> NSRect {
     let width = min(size.width, screen.width)
     let height = min(size.height, screen.height)
-    let below = caret.minY - 5 - height
-    let above = caret.maxY + 5
+    let below = caret.minY - QingTypeCandidateMetrics.caretGap - height
+    let above = caret.maxY + QingTypeCandidateMetrics.caretGap
     let y = below >= screen.minY ? below : above
-    return NSRect(x: min(max(caret.minX, screen.minX), screen.maxX - width),
+    return NSRect(x: min(max(caret.minX - QingTypeCandidateMetrics.anchorOffset, screen.minX), screen.maxX - width),
                   y: min(max(y, screen.minY), screen.maxY - height), width: width, height: height)
   }
 }
@@ -82,7 +94,7 @@ private final class CandidateCell: NSButton {
   override func draw(_ dirtyRect: NSRect) {
     if selectedCandidate {
       NSColor.controlAccentColor.setFill()
-      let pill = NSRect(x: 1, y: 2, width: bounds.width - 3, height: bounds.height - 4)
+      let pill = NSRect(x: 1, y: 2, width: bounds.width - 4, height: bounds.height - 4)
       NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2).fill()
     }
     if let number {
@@ -99,7 +111,7 @@ private final class CandidateCell: NSButton {
       .foregroundColor: selectedCandidate ? NSColor.white : .labelColor,
       .paragraphStyle: style
     ])
-    text.draw(in: NSRect(x: 14, y: (bounds.height - text.size().height) / 2,
+    text.draw(in: NSRect(x: QingTypeCandidateMetrics.textInset, y: (bounds.height - text.size().height) / 2,
                         width: max(0, bounds.width - 18), height: text.size().height))
   }
 }
@@ -180,17 +192,19 @@ final class QingTypeExpandedCandidates: NSPanel {
     let offset = candidates.firstIndex { $0.index == highlighted } ?? 0
     let pageStart = expanded ? 0 : offset / self.pageSize * self.pageSize
     let row = Array(candidates.dropFirst(pageStart).prefix(self.pageSize))
-    var widths = row.map { min(180, max(36, ($0.text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: pointSize)]).width + 23)) }
+    var widths = row.map { min(180, max(36, ($0.text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: pointSize)]).width + 25)) }
     // Reserve the chevron's entire hit region, even for the last candidate.
-    var width = min(maxWidth, widths.reduce(6, +) + 30)
-    if vertical { width = min(maxWidth, max(160, (widths.max() ?? 100) + 36)) }
+    let chromeWidth = QingTypeCandidateMetrics.chromeWidth
+    var width = min(maxWidth, widths.reduce(chromeWidth, +))
+    if vertical { width = min(maxWidth, max(160, (widths.max() ?? 100) + chromeWidth)) }
     if expanded { width = min(maxWidth, max(360, width)) }
-    let gridCellWidth = (width - 36) / 6
+    let gridCellWidth = (width - chromeWidth) / 6
     columns = expanded ? 6 : (vertical ? 1 : row.count)
     hasMoreCandidates = candidates.count > row.count
     let bodyRows = expanded ? Int(ceil(Double(max(0, candidates.count - columns)) / Double(columns))) : 0
     let bodyHeight = min(CGFloat(min(4, bodyRows)) * rowHeight, max(0, screen.height - rowHeight - 12))
-    let height = expanded ? rowHeight + bodyHeight + 6 : (vertical ? rowHeight * CGFloat(row.count) + 4 : rowHeight + 4)
+    let inset = QingTypeCandidateMetrics.verticalInset
+    let height = (expanded ? rowHeight + bodyHeight : (vertical ? rowHeight * CGFloat(row.count) : rowHeight)) + inset * 2
     let frame = QingTypeCandidatePlacement.frame(size: NSSize(width: width, height: height), caret: caretRect, screen: screen)
     if self.frame != frame { setFrame(frame, display: false) }
     appearance = NSApp.effectiveAppearance
@@ -206,12 +220,12 @@ final class QingTypeExpandedCandidates: NSPanel {
       background.layer?.borderWidth = 0.5
       background.layer?.masksToBounds = true
       contentView = background
-      let header = CandidateRowsView(frame: NSRect(x: 0, y: 2, width: width, height: expanded ? rowHeight : height - 4))
+      let header = CandidateRowsView(frame: NSRect(x: 0, y: inset, width: width, height: expanded ? rowHeight : height - inset * 2))
       header.rowHeight = rowHeight
       background.addSubview(header)
       let body = CandidateRowsView(frame: NSRect(x: 0, y: 0, width: width, height: CGFloat(bodyRows) * rowHeight))
       body.rowHeight = rowHeight
-      scroll.frame = NSRect(x: 0, y: rowHeight + 2, width: width, height: bodyHeight)
+      scroll.frame = NSRect(x: 0, y: rowHeight + inset, width: width, height: bodyHeight)
       scroll.drawsBackground = false
       scroll.borderType = .noBorder
       scroll.hasVerticalScroller = true
@@ -224,20 +238,21 @@ final class QingTypeExpandedCandidates: NSPanel {
       let displayed = expanded ? candidates : row
       numberedCandidates = Array(displayed.prefix(expanded ? columns : self.pageSize))
       if !expanded && !vertical {
-        let available = width - 36
+        let available = width - chromeWidth
         let total = widths.reduce(0, +)
         if total > available { widths = widths.map { $0 * available / total } }
       }
-      var x: CGFloat = 2
+      let leading = QingTypeCandidateMetrics.leading
+      var x = leading
       for (index, candidate) in displayed.enumerated() {
         let inHeader = !expanded || index < columns
         let local = inHeader ? index : index - columns
         let cell = CandidateCell(candidate: candidate, number: inHeader ? index + 1 : nil, pointSize: pointSize)
         if expanded {
-          cell.frame = NSRect(x: 2 + CGFloat(local % columns) * gridCellWidth, y: CGFloat(local / columns) * rowHeight,
+          cell.frame = NSRect(x: leading + CGFloat(local % columns) * gridCellWidth, y: CGFloat(local / columns) * rowHeight,
                               width: gridCellWidth, height: rowHeight)
         } else if vertical {
-          cell.frame = NSRect(x: 2, y: CGFloat(index) * rowHeight, width: width - 36, height: rowHeight)
+          cell.frame = NSRect(x: leading, y: CGFloat(index) * rowHeight, width: width - chromeWidth, height: rowHeight)
         } else {
           cell.frame = NSRect(x: x, y: 0, width: widths[index], height: rowHeight)
           x += widths[index]
@@ -246,7 +261,7 @@ final class QingTypeExpandedCandidates: NSPanel {
         cell.onHover = { [weak self] index in self?.highlight(index, scrollToSelection: false) }
         (inHeader ? header : body).addSubview(cell)
         cells.append(cell)
-        if inHeader { cellFrames.append(cell.frame.offsetBy(dx: 0, dy: 2)) }
+        if inHeader { cellFrames.append(cell.frame.offsetBy(dx: 0, dy: inset)) }
       }
       toggleFrame = .zero
       if expanded || hasMoreCandidates {
@@ -257,8 +272,14 @@ final class QingTypeExpandedCandidates: NSPanel {
         toggle.contentTintColor = .secondaryLabelColor
         toggle.toolTip = expanded ? "收起候选（Esc）" : "展开候选（↓）"
         toggle.setAccessibilityLabel(expanded ? "收起候选" : "展开候选")
-        toggleFrame = NSRect(x: width - 30, y: 2, width: 26, height: rowHeight)
+        toggleFrame = NSRect(x: width - leading - QingTypeCandidateMetrics.accessoryWidth, y: inset,
+                             width: QingTypeCandidateMetrics.accessoryWidth, height: rowHeight)
         toggle.frame = toggleFrame
+        if !expanded && !vertical {
+          let divider = NSBox(frame: NSRect(x: toggleFrame.minX, y: 4.5, width: 0.5, height: max(0, height - 9)))
+          divider.boxType = .separator
+          background.addSubview(divider)
+        }
         background.addSubview(toggle)
       }
     }
