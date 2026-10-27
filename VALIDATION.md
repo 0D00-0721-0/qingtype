@@ -4,6 +4,32 @@ Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+## Wanxiang update checks and stalled requests — 0.6.2
+
+Existing-model buttons now check the official LTS SHA-256 before downloading.
+A matching registered local file is size/hash validated, then returns without
+configuration edits, deployment or service restart. Metadata from the check is
+reused for the download. Fresh/different models retain the existing verified
+import/apply path. Inactive matching models keep the user's current selection.
+
+Twenty isolated model checks pass, plus twelve metadata/request cancellation
+checks: whole-resource versus idle timeout, rate limits, invalid responses,
+cancelled in-flight requests, retry after cancellation and cancellable local
+hashing. Recovery hashes remain non-interruptible by default. The full local
+regression and mounted DMG checks pass. Real official metadata plus the cached
+418MB model verified the matching/no-download branch in an isolated directory.
+
+The old UI could keep saying "checking" while connecting to the model download,
+and hid cancellation until the first received bytes. Metadata now uses a fresh
+session with 10-second idle / 15-second resource limits. Cancellation is exposed
+throughout checking and connecting; stage text changes before download begins.
+The busy GUI was quit while leaving the input service running. Both installed
+bundles were updated to 0.6.2 with all saved settings equal. The native check
+then detected the actual older model and entered downloading; clicking Cancel
+restored the controls immediately. Settings/deployment hashes and mtimes plus
+input-service PIDs were unchanged. The existing model was not replaced. Full
+real download/activation and a GUI app self-update remain separate acceptance.
+
 ## Long collapsed candidates — 0.6.1
 
 The user reported a long first candidate ending in an ellipsis and supplied an Apple

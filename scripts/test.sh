@@ -13,6 +13,10 @@ swiftc -parse-as-library -swift-version 5 shared/*.swift tests/RimeIceTests.swif
 build/rime-ice-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/SetupTests.swift "${yaml_flags[@]}" -o build/setup-tests
 build/setup-tests
+swiftc -parse-as-library -swift-version 5 shared/*.swift tests/WanxiangUpdateTests.swift "${yaml_flags[@]}" -o build/wanxiang-update-tests
+build/wanxiang-update-tests
+swiftc -parse-as-library -swift-version 5 shared/*.swift tests/MetadataRequestTests.swift "${yaml_flags[@]}" -o build/metadata-request-tests
+build/metadata-request-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/LearningTests.swift "${yaml_flags[@]}" -o build/learning-tests
 build/learning-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/MaintenanceTests.swift "${yaml_flags[@]}" -o build/maintenance-tests

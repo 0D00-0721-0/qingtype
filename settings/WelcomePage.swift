@@ -22,18 +22,27 @@ extension SettingsModel {
     }
   }
 
-  func downloadWanxiang() {
+  func checkWanxiangUpdate() {
     guard !busy, !loadFailed, inputReady else { return }
     guard !isDirty else { failed = true; message = "请先保存当前更改，再安装万象模型。"; return }
     let original = saved
     busy = true; failed = false; canCancelDownload = true
-    transferProgress = nil; message = "正在获取万象官方模型信息…"
+    checkingModelUpdate = true
+    transferProgress = nil; message = "正在检查万象模型更新…"
     componentTask = Task {
-      defer { busy = false; canCancelDownload = false; transferProgress = nil; componentTask = nil }
+      defer { busy = false; checkingModelUpdate = false; canCancelDownload = false; transferProgress = nil; componentTask = nil }
       var downloaded: QingTypeDownloadedAsset?
       defer { if let downloaded { try? FileManager.default.removeItem(at: downloaded.directory) } }
       do {
-        downloaded = try await QingTypeWanxiang.download(schema: original.schema) { [self] progress in
+        let update = try await QingTypeWanxiang.checkUpdate(schema: original.schema, models: original.models, directory: QingTypePaths.userDirectory)
+        try Task.checkCancellation()
+        guard try QingTypeSettings.load() == original else { throw SettingsError.invalid("设置已被其他程序修改，请重开清言后重试。") }
+        if update.installed != nil {
+          message = "已安装的万象模型已是官方最新版本，无需下载。"
+          return
+        }
+        checkingModelUpdate = false; message = "正在下载万象模型…"
+        downloaded = try await QingTypeWanxiang.download(update) { [self] progress in
           Task { @MainActor in if self.canCancelDownload { self.transferProgress = progress; self.message = "正在下载万象模型…" } }
         }
         try Task.checkCancellation()
@@ -48,7 +57,9 @@ extension SettingsModel {
         settings = updated; saved = updated; deployment = report
         message = "万象模型已启用，之后输入可离线使用。"
       } catch {
-        if Task.isCancelled || (error as? URLError)?.code == .cancelled { message = "已取消下载，当前输入设置保持不变。" }
+        if Task.isCancelled || (error as? URLError)?.code == .cancelled {
+          message = checkingModelUpdate ? "已取消模型更新检查。" : "已取消下载，当前输入设置保持不变。"
+        }
         else { failed = true; message = error.localizedDescription }
       }
     }
@@ -147,7 +158,7 @@ struct WanxiangCard: View {
           if let active = model.settings.activeModel {
             Label("已启用：\(active.name)", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.secondary)
           }
-          Button(model.settings.activeModel == nil ? "下载安装并启用万象" : "下载官方最新模型", action: model.downloadWanxiang)
+          Button(model.settings.models.isEmpty ? "下载安装并启用万象" : "检查模型更新", action: model.checkWanxiangUpdate)
             .disabled(model.busy || !model.inputReady)
         }
         Link("模型来源与许可", destination: URL(string: "https://github.com/amzxyz/rime-wanxiang-data")!)

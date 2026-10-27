@@ -47,17 +47,36 @@ enum QingTypeDownloads {
     }
   }
 
-  static func release(repository: String, tag: String) async throws -> QingTypeRelease {
+  static func metadataConfiguration() -> URLSessionConfiguration {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.timeoutIntervalForRequest = 10
+    configuration.timeoutIntervalForResource = 15
+    configuration.waitsForConnectivity = false
+    return configuration
+  }
+
+  static func release(repository: String, tag: String, session providedSession: URLSession? = nil) async throws -> QingTypeRelease {
     // Callers use an internal catalog; no user-controlled URLs or credentials.
     guard ["iDvel/rime-ice", "amzxyz/rime-wanxiang-data"].contains(repository),
           ["latest", "LTS"].contains(tag) else { throw SettingsError.invalid("未知的组件来源。") }
     let suffix = tag == "latest" ? "latest" : "tags/" + tag
     var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(repository)/releases/\(suffix)")!)
-    request.timeoutInterval = 45
+    request.timeoutInterval = 10
     request.setValue("QingType", forHTTPHeaderField: "User-Agent")
     request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-    let (data, response) = try await URLSession.shared.data(for: request)
-    guard (response as? HTTPURLResponse)?.statusCode == 200, data.count < 2 * 1024 * 1024 else {
+    let session = providedSession ?? URLSession(configuration: metadataConfiguration())
+    defer { if providedSession == nil { session.invalidateAndCancel() } }
+    let data: Data
+    let response: URLResponse
+    do { (data, response) = try await session.data(for: request) }
+    catch let error as URLError where error.code == .timedOut {
+      throw SettingsError.invalid("检查官方更新超时，请稍后重试（最长等待 15 秒）。")
+    }
+    let http = response as? HTTPURLResponse
+    if http?.statusCode == 429 || (http?.statusCode == 403 && http?.value(forHTTPHeaderField: "X-RateLimit-Remaining") == "0") {
+      throw SettingsError.invalid("GitHub 暂时限制检查请求，请稍后再试。现有设置保持不变。")
+    }
+    guard http?.statusCode == 200, data.count < 2 * 1024 * 1024 else {
       throw SettingsError.invalid("无法读取官方组件信息，请检查网络后重试，也可以从本地文件导入。")
     }
     return try JSONDecoder().decode(QingTypeRelease.self, from: data)
@@ -103,8 +122,52 @@ enum QingTypeDownloads {
 
 enum QingTypeWanxiang {
   static let repository = "amzxyz/rime-wanxiang-data"
+  static let downloadLimit: Int64 = 1024 * 1024 * 1024
+  struct Update {
+    var release: String
+    var asset: QingTypeRelease.Asset
+    var installed: GrammarAsset?
+  }
   static func filename(schema: String) -> String { "wanxiang-lts-zh-" + (schema == "luna_pinyin" ? "hant" : "hans") + ".gram" }
+  static func checkUpdate(schema: String, models: [GrammarAsset], directory: URL) async throws -> Update {
+    let release = try await QingTypeDownloads.release(repository: repository, tag: "LTS")
+    try Task.checkCancellation()
+    let worker = Task.detached {
+      try inspect(release: release, schema: schema, models: models, directory: directory)
+    }
+    return try await withTaskCancellationHandler {
+      try Task.checkCancellation()
+      return try await worker.value
+    } onCancel: { worker.cancel() }
+  }
+
+  // Inspect the same metadata that will be used for the download. LTS is a
+  // mutable upstream tag; fetching it again could select a different asset.
+  static func inspect(release: QingTypeRelease, schema: String, models: [GrammarAsset], directory: URL) throws -> Update {
+    try QingTypePaths.checkDirectory(directory)
+    guard release.tag_name == "LTS",
+          let asset = release.assets.first(where: { $0.name == filename(schema: schema) }) else {
+      throw SettingsError.invalid("官方发行中没有找到当前输入方案所需的万象模型。")
+    }
+    let hash = try asset.validate(repository: repository, limit: downloadLimit)
+    var result = Update(release: release.tag_name, asset: asset, installed: nil)
+    guard let model = models.first(where: { $0.id == hash && $0.sha256 == hash && $0.language == "qingtype_model_" + hash }) else { return result }
+    let file = directory.appendingPathComponent("qingtype_model_\(hash).gram")
+    guard FileManager.default.fileExists(atPath: file.path) else { return result }
+    let values = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+    guard values.isRegularFile == true, values.isSymbolicLink != true,
+          Int64(values.fileSize ?? 0) == asset.size, try QingTypeContent.digest(of: file, checkingCancellation: true) == hash else {
+      throw SettingsError.invalid("本地万象模型未通过文件校验，已停止更新检查，现有文件未改动。")
+    }
+    result.installed = model
+    return result
+  }
+
+  static func download(_ update: Update, progress: @escaping @Sendable (QingTypeTransferProgress) -> Void = { _ in }) async throws -> QingTypeDownloadedAsset {
+    try await QingTypeDownloads.download(asset: update.asset, repository: repository, release: update.release, limit: downloadLimit, progress: progress)
+  }
+
   static func download(schema: String, progress: @escaping @Sendable (QingTypeTransferProgress) -> Void = { _ in }) async throws -> QingTypeDownloadedAsset {
-    try await QingTypeDownloads.download(repository: repository, tag: "LTS", filename: filename(schema: schema), limit: 1024 * 1024 * 1024, progress: progress)
+    try await QingTypeDownloads.download(repository: repository, tag: "LTS", filename: filename(schema: schema), limit: downloadLimit, progress: progress)
   }
 }

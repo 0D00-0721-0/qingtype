@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 app, settings = map(Path, sys.argv[1:])
-version = '0.6.1'
+version = '0.6.2'
 source = plistlib.loads(Path('resources/Info.plist').read_bytes())
 
 def rename(value):

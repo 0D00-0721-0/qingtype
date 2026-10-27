@@ -24,11 +24,15 @@ struct GrammarAsset: Codable, Equatable, Identifiable {
 }
 
 enum QingTypeContent {
-  static func digest(of url: URL) throws -> String {
+  static func digest(of url: URL, checkingCancellation: Bool = false) throws -> String {
+    if checkingCancellation { try Task.checkCancellation() }
     let file = try FileHandle(forReadingFrom: url)
     defer { try? file.close() }
     var hash = SHA256()
-    while let data = try file.read(upToCount: 1_048_576), !data.isEmpty { hash.update(data: data) }
+    while let data = try file.read(upToCount: 1_048_576), !data.isEmpty {
+      if checkingCancellation { try Task.checkCancellation() }
+      hash.update(data: data)
+    }
     return hash.finalize().map { String(format: "%02x", $0) }.joined()
   }
 

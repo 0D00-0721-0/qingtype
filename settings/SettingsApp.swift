@@ -30,6 +30,7 @@ final class SettingsModel: ObservableObject {
   @Published var inputEnabled = false
   @Published var transferProgress: QingTypeTransferProgress?
   @Published var canCancelDownload = false
+  @Published var checkingModelUpdate = false
   @Published var learningSummary = "正在读取本机学习数据…"
   @Published var maintenance = QingTypeMaintenancePreferences()
   @Published var appUpdate: QingTypeAppUpdate?
@@ -215,12 +216,14 @@ struct SettingsView: View {
           }.padding(28).frame(maxWidth: 780, alignment: .leading)
         }
         Divider()
-        if let progress = model.transferProgress, model.canCancelDownload {
+        if model.canCancelDownload {
           HStack {
-            ProgressView(value: progress.fraction)
-            Text("\(ByteCountFormatter.string(fromByteCount: progress.received, countStyle: .file)) / \(ByteCountFormatter.string(fromByteCount: progress.total, countStyle: .file))")
-              .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-            Button("取消下载") { model.componentTask?.cancel() }
+            if let progress = model.transferProgress {
+              ProgressView(value: progress.fraction)
+              Text("\(ByteCountFormatter.string(fromByteCount: progress.received, countStyle: .file)) / \(ByteCountFormatter.string(fromByteCount: progress.total, countStyle: .file))")
+                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            } else { Spacer() }
+            Button(model.checkingModelUpdate ? "取消检查" : "取消下载") { model.componentTask?.cancel() }
           }.padding(.horizontal, 16).padding(.top, 10)
         }
         HStack {
