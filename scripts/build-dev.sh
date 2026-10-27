@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+python3 scripts/version.py read >/dev/null
 if [[ "$(uname -m)" != "arm64" ]]; then
   echo "清言仅支持 M 芯片 Mac，请使用原生 arm64 终端构建。" >&2
   exit 1

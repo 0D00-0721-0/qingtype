@@ -2,9 +2,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 input_app="$PWD/build/QingType.app"
+version=$(python3 scripts/version.py read)
+python3 scripts/version.py check-bundles "$input_app" "$input_app/Contents/Applications/QingType Settings.app"
 test -x "$input_app/Contents/MacOS/QingType"
 codesign --verify --deep --strict "$input_app"
-distribution="$PWD/build/distribution"
+distribution="${QINGTYPE_DISTRIBUTION_DIR:-$PWD/build/distribution}"
 app="$distribution/清言.app"
 mkdir -p "$distribution"
 rm -rf "$app"
@@ -33,8 +35,8 @@ else
   codesign --force --sign - "$app"
 fi
 codesign --verify --deep --strict "$app"
-version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$app/Contents/Info.plist")
-image="$distribution/QingType-$version-$(uname -m).dmg"
+python3 scripts/version.py check-bundles "$app" "$app/Contents/Resources/InputMethod/QingType.app" "$app/Contents/Resources/InputMethod/QingType.app/Contents/Applications/QingType Settings.app"
+image="$distribution/$(python3 scripts/version.py package-name "$(uname -m)")"
 stage=$(mktemp -d "$PWD/build/dmg-stage-XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 ditto "$app" "$stage/清言.app"

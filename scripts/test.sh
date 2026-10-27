@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+python3 tests/VersionTests.py
+python3 scripts/version.py check-bundles build/QingType.app 'build/QingType.app/Contents/Applications/QingType Settings.app'
 mkdir -p build
 yaml_build_dir=$(swift build --package-path dependencies -c release --show-bin-path)
 yaml_flags=(-I "$yaml_build_dir" -I "$yaml_build_dir/Modules" -I dependencies/.build/checkouts/Yams/Sources/CYaml/include -L "$yaml_build_dir" -lQingTypeYAML)

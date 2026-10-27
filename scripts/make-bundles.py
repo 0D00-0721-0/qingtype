@@ -1,9 +1,10 @@
 import plistlib
 import sys
 from pathlib import Path
+from version import product_version
 
 app, settings = map(Path, sys.argv[1:])
-version = '0.6.2'
+version = product_version()
 source = plistlib.loads(Path('resources/Info.plist').read_bytes())
 
 def rename(value):
@@ -19,7 +20,7 @@ def rename(value):
     return value
 
 info = rename(source)
-info.update(CFBundleDisplayName='清言', CFBundleName='清言', CFBundleShortVersionString=version,
+info.update(CFBundleDisplayName='清言', CFBundleName='清言', CFBundleShortVersionString=version, CFBundleVersion=version,
             CFBundleIconFile='QingType.icns', LSMinimumSystemVersion='14.0')
 # Sandboxed text clients resolve the endpoint using the full bundle identifier.
 info['InputMethodConnectionName'] = info['CFBundleIdentifier'] + '_Connection'

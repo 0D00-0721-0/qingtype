@@ -30,6 +30,7 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+$ ]]
           git show-ref --verify "refs/tags/$RELEASE_TAG"
           test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          python3 scripts/version.py check-tag "$RELEASE_TAG"
       - uses: actions/checkout@v6
         with:
           repository: iDvel/rime-ice
@@ -47,11 +48,9 @@ jobs:
           ./scripts/package-app.sh
           python3 tests/DistributionTests.py
           python3 - <<'PY'
-          import json, os, plistlib
+          import json
           from pathlib import Path
           root = Path('build/distribution/清言.app/Contents')
-          version = plistlib.loads((root / 'Info.plist').read_bytes())['CFBundleShortVersionString']
-          assert os.environ['RELEASE_TAG'].startswith('v' + version + '-preview.')
           assert json.loads((root / 'Resources/BuildInfo.json').read_text())['workingTreeClean']
           PY
       - uses: actions/upload-artifact@v4

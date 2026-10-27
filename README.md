@@ -85,6 +85,10 @@ open "build/distribution/清言.app"
 运行库逐文件哈希、许可文本和构建来源记录见 [固定依赖说明](docs/DEPENDENCIES.md)。
 仅支持 M 芯片 Mac，构建目标为 macOS 14.0；输出 `build/QingType.app` 输入服务和原生设置，打包生成
 `build/distribution/清言.app` 与 `QingType-<版本>-<架构>.dmg`，包内没有可选模型和个人数据。
+产品版本唯一来源是仓库根目录 `VERSION`，采用三段数字 `major.minor.patch`；
+输入法、设置和分发应用的 `CFBundleShortVersionString` 与 `CFBundleVersion` 均使用该值。
+每次发布新产品版本时更新 `VERSION`；同一版本的预览序号只放在 tag 中，格式为
+`v<版本>-preview.<序号>`。发布工作流会核对 tag，打包会拒绝版本不一致的应用。
 
 ```sh
 ./scripts/install-dev.sh

@@ -4,6 +4,13 @@ import plistlib
 import subprocess
 import hashlib
 import time
+import sys
+import os
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+from version import check_bundles, product_version
+
+version = product_version()
 
 def detach_test_image(mount):
     # Spotlight or other system readers may briefly retain a newly exercised
@@ -18,8 +25,11 @@ def detach_test_image(mount):
             raise subprocess.CalledProcessError(result.returncode, command)
         time.sleep(0.5)
 
-app = Path('build/distribution/清言.app')
+distribution = Path(os.environ.get('QINGTYPE_DISTRIBUTION_DIR', 'build/distribution'))
+app = distribution / '清言.app'
 payload = app / 'Contents/Resources/InputMethod/QingType.app'
+settings = payload / 'Contents/Applications/QingType Settings.app'
+check_bundles(version, [app, payload, settings])
 
 def info(path):
     return plistlib.loads((path / 'Contents/Info.plist').read_bytes())
@@ -55,8 +65,9 @@ for binary in [app / 'Contents/MacOS/QingTypeSettings', payload / 'Contents/MacO
     links = subprocess.check_output(['/usr/bin/otool', '-L', str(binary)], text=True)
     assert '/Library/Input Methods/Squirrel.app' not in links
     assert '/Users/yuyiyang/' not in '\n'.join(links.splitlines()[1:])
-images = list(Path('build/distribution').glob('QingType-*.dmg'))
-assert images and all(p.with_suffix('.dmg.sha256').exists() for p in images)
+expected_image = distribution / f'QingType-{version}-arm64.dmg'
+images = list(distribution.glob('QingType-*.dmg'))
+assert expected_image in images and all(p.with_suffix('.dmg.sha256').exists() for p in images)
 for image in images:
     digest, name = image.with_suffix('.dmg.sha256').read_text().strip().split(maxsplit=1)
     assert name == image.name and hashlib.sha256(image.read_bytes()).hexdigest() == digest
@@ -65,6 +76,9 @@ for image in images:
     subprocess.run(['/usr/bin/hdiutil', 'attach', '-quiet', '-nobrowse', '-readonly', '-mountpoint', str(mount), str(image)], check=True)
     try:
         mounted = mount / '清言.app'
+        if image == expected_image:
+            mounted_payload = mounted / 'Contents/Resources/InputMethod/QingType.app'
+            check_bundles(version, [mounted, mounted_payload, mounted_payload / 'Contents/Applications/QingType Settings.app'])
         subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(mounted)], check=True)
         binary = mounted / 'Contents/Resources/InputMethod/QingType.app/Contents/MacOS/QingType'
         subprocess.run([str(binary), '--factory-engine-test'], check=True)
