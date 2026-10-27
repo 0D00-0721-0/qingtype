@@ -15,6 +15,8 @@ swiftc -parse-as-library -swift-version 5 shared/*.swift tests/SetupTests.swift 
 build/setup-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/LearningTests.swift "${yaml_flags[@]}" -o build/learning-tests
 build/learning-tests
+swiftc -parse-as-library -swift-version 5 shared/*.swift tests/MaintenanceTests.swift "${yaml_flags[@]}" -o build/maintenance-tests
+build/maintenance-tests
 build/content-tests
 build/QingType.app/Contents/MacOS/QingType --engine-smoke-test
 build/QingType.app/Contents/MacOS/QingType --factory-engine-test

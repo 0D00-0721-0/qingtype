@@ -57,6 +57,7 @@ swiftc -parse-as-library -swift-version 5 -module-name QingTypeSettings \
   -o "$settings_app/Contents/MacOS/QingTypeSettings"
 
 swift scripts/generate-icons.swift "$app/Contents/Resources" "$settings_app/Contents/Resources"
+python3 scripts/build-provenance.py "$app" "$settings_app" "$runtime_app"
 codesign --force --sign - "$settings_app"
 find "$app/Contents/Frameworks" -type f -name '*.dylib' -exec codesign --force --sign - {} \;
 codesign --force --sign - "$app"

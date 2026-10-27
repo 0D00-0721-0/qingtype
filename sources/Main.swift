@@ -20,6 +20,16 @@ struct SquirrelApp {
 
     let handled = autoreleasepool {
       let installer = SquirrelInstaller()
+      if CommandLine.arguments.contains("--diagnostic-report") {
+        let report = QingTypeSystemDiagnostics.report(api: rimeAPI, installer: installer)
+        if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) { print(String(decoding: data, as: UTF8.self)) }
+        return true
+      }
+      if let index = CommandLine.arguments.firstIndex(of: "--engine-stress-test") {
+        let cycles = CommandLine.arguments.count > index + 1 ? Int(CommandLine.arguments[index + 1]) ?? 2000 : 2000
+        guard (100...100000).contains(cycles) else { exit(1) }
+        return QingTypeSystemDiagnostics.stress(api: rimeAPI, cycles: cycles)
+      }
       if let index = CommandLine.arguments.firstIndex(of: "--learning-restart-probe"), CommandLine.arguments.count > index + 2 {
         if !QingTypeLearningDiagnostics.probe(api: rimeAPI, directory: URL(fileURLWithPath: CommandLine.arguments[index + 1]), schema: CommandLine.arguments[index + 2]) { exit(1) }
         return true
@@ -102,6 +112,18 @@ struct SquirrelApp {
       let args = CommandLine.arguments
       if args.count > 1 {
         switch args[1] {
+        case "--prepare-uninstall":
+          do {
+            let previous = try installer.prepareUninstall()
+            print(String(decoding: try JSONSerialization.data(withJSONObject: ["inputSources": previous]), as: UTF8.self))
+          } catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
+          return true
+        case "--restore-uninstall-source":
+          guard args.count >= 3 else { exit(1) }
+          let modes = args[2].split(separator: ",").compactMap { SquirrelInstaller.InputMode(rawValue: String($0)) }
+          if !modes.isEmpty { installer.enable(modes: modes) }
+          if args.count > 3, let mode = SquirrelInstaller.InputMode(rawValue: args[3]), modes.contains(mode) { installer.select(mode: mode) }
+          return true
         case "--status":
           let report: [String: Any] = [
             "bundle": Bundle.main.bundleIdentifier ?? "", "userDirectory": userDir.path,

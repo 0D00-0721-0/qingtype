@@ -38,13 +38,26 @@ if not valid_archive(archive):
 expanded = cache / 'expanded'
 marker = cache / 'archive.sha256'
 apps = list(expanded.rglob('Squirrel.app')) if expanded.exists() else []
-if not marker.exists() or marker.read_text() != lock['sha256'] or len(apps) != 1:
+file_lock = json.loads((project / 'dependencies/runtime-files.lock.json').read_text())
+assert file_lock['packageSHA256'] == lock['sha256'], '运行库文件清单与安装包不一致'
+
+def valid_contents(app):
+    expected = file_lock['files']
+    actual = {p.relative_to(app).as_posix() for folder in ['Contents/Frameworks', 'Contents/SharedSupport']
+              for p in (app / folder).rglob('*') if p.is_file()}
+    return actual == set(expected) and all(
+        hashlib.sha256((app / relative).read_bytes()).hexdigest() == digest
+        for relative, digest in expected.items())
+
+if not marker.exists() or marker.read_text() != lock['sha256'] or len(apps) != 1 or not valid_contents(apps[0]):
     shutil.rmtree(expanded, ignore_errors=True)
     subprocess.run(['/usr/sbin/pkgutil', '--expand-full', str(archive), str(expanded)],
                    check=True, stdout=sys.stderr)
     apps = list(expanded.rglob('Squirrel.app'))
     if len(apps) != 1:
         raise RuntimeError('运行库包不包含唯一的 Squirrel.app')
+    if not valid_contents(apps[0]):
+        raise RuntimeError('解包后的运行库与固定文件清单不一致')
     marker.write_text(lock['sha256'])
 
 runtime = apps[0]

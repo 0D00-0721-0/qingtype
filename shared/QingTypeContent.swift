@@ -33,6 +33,7 @@ enum QingTypeContent {
   }
 
   static func importGrammar(from source: URL, into directory: URL) throws -> GrammarAsset {
+    try QingTypePaths.checkDirectory(directory)
     guard source.pathExtension.lowercased() == "gram" else {
       throw SettingsError.invalid("请选择 Rime 的 .gram 语言模型文件。")
     }
@@ -72,6 +73,7 @@ enum QingTypeContent {
   // Read dictionary data only. Dependencies stay inside the selected file's folder.
   // A flat list is returned because Rime does not recursively expand import_tables.
   static func importDictionary(from source: URL, into directory: URL) throws -> DictionaryAsset {
+    try QingTypePaths.checkDirectory(directory)
     guard source.lastPathComponent.hasSuffix(".dict.yaml") else {
       throw SettingsError.invalid("请选择 Rime 的 .dict.yaml 词库文件。")
     }

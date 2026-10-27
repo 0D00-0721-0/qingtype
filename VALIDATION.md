@@ -1,8 +1,36 @@
-# Local validation — 2026-10-27 — QingType 0.5.0
+# Local validation — 2026-10-27 — QingType 0.6.0
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
+
+## Maintenance, provenance and compatibility — 0.6.0
+
+The full scripts/test.sh regression and mounted DMG DistributionTests passed locally.
+The new 26-check maintenance suite verifies application replacement, checksum backup,
+injected installed-validation failure, actual archive restore, downgrade refusal,
+release/CPU/origin filtering, default-off update networking, profile-link refusal,
+whole-program uninstall staging/undo, partial move rollback and unchanged private bytes.
+The existing learning and candidate suites pass; destructive operations remain isolated.
+
+An isolated 5,000-cycle engine/candidate-layout loop completed without empty candidates:
+mean 4.62ms, p95 11.14ms; warm/final RSS 372304/393744KiB. This is neither host
+keystroke latency nor a long-duration or model-enabled stability test. Diagnostic
+JSON was exported and checked for absence of absolute home paths; synthetic private
+words/pinyin/phrases are excluded by the summary test.
+
+User acceptance added: Safari personal new word commits and remains available after
+reapplying; QQ search field nihao + Space commits without exiting. Neither result
+covers every control or CRUD action. See docs/COMPATIBILITY.md for expected/actual
+and pending multi-screen, sleep, other application and prolonged-use checks.
+
+The build checks 181 fixed runtime/resource files and 16 source notice digests,
+and bundles notices plus source commit/clean state/architecture/toolchain provenance.
+The official Squirrel PKG differs from the matching Rime SDK in Mach-O UUID and Lua
+patch version; SDK plugin revisions are recipe evidence, not byte-equivalence proof.
+This remaining source rebuild audit is explicit in docs/DEPENDENCIES.md.
+Multi-system/Intel remote CI and native installation/UI results will be recorded
+in PROGRESS.md after completion. This machine still has zero valid signing identities.
 
 ## Rime learning, persistence and recovery — 0.5.0
 

@@ -1,0 +1,113 @@
+/***********************************************************
+Copyright 1987, 1994, 1998  The Open Group
+
+Permission to use, copy, modify, distribute, and sell this software and its
+documentation for any purpose is hereby granted without fee, provided that
+the above copyright notice appear in all copies and that both that
+copyright notice and this permission notice appear in supporting
+documentation.
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE OPEN GROUP BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+Except as contained in this notice, the name of The Open Group shall
+not be used in advertising or otherwise to promote the sale, use or
+other dealings in this Software without prior written authorization
+from The Open Group.
+
+
+Copyright 1987 by Digital Equipment Corporation, Maynard, Massachusetts
+
+                        All Rights Reserved
+
+Permission to use, copy, modify, and distribute this software and its
+documentation for any purpose and without fee is hereby granted,
+provided that the above copyright notice appear in all copies and that
+both that copyright notice and this permission notice appear in
+supporting documentation, and that the name of Digital not be
+used in advertising or publicity pertaining to distribution of the
+software without specific, written prior permission.
+
+DIGITAL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING
+ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL
+DIGITAL BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR
+ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+SOFTWARE.
+
+******************************************************************/
+
+/*
+ * The "X11 Window System Protocol" standard defines in Appendix A the
+ * keysym codes. These 29-bit integer values identify characters or
+ * functions associated with each key (e.g., via the visible
+ * engraving) of a keyboard layout. This file assigns mnemonic macro
+ * names for these keysyms.
+ *
+ * This file is also compiled (by src/util/makekeys.c in libX11) into
+ * hash tables that can be accessed with X11 library functions such as
+ * XStringToKeysym() and XKeysymToString().
+ *
+ * Where a keysym corresponds one-to-one to an ISO 10646 / Unicode
+ * character, this is noted in a comment that provides both the U+xxxx
+ * Unicode position, as well as the official Unicode name of the
+ * character.
+ *
+ * Where the correspondence is either not one-to-one or semantically
+ * unclear, the Unicode position and name are enclosed in
+ * parentheses. Such legacy keysyms should be considered deprecated
+ * and are not recommended for use in future keyboard mappings.
+ *
+ * For any future extension of the keysyms with characters already
+ * found in ISO 10646 / Unicode, the following algorithm shall be
+ * used. The new keysym code position will simply be the character's
+ * Unicode number plus 0x01000000. The keysym values in the range
+ * 0x01000100 to 0x0110ffff are reserved to represent Unicode
+ * characters in the range U+0100 to U+10FFFF.
+ * 
+ * While most newer Unicode-based X11 clients do already accept
+ * Unicode-mapped keysyms in the range 0x01000100 to 0x0110ffff, it
+ * will remain necessary for clients -- in the interest of
+ * compatibility with existing servers -- to also understand the
+ * existing legacy keysym values in the range 0x0100 to 0x20ff.
+ *
+ * Where several mnemonic names are defined for the same keysym in this
+ * file, all but the first one listed should be considered deprecated.
+ *
+ * Mnemonic names for keysyms are defined in this file with lines
+ * that match one of these Perl regular expressions:
+ *
+ *    /^\#define XK_([a-zA-Z_0-9]+)\s+0x([0-9a-f]+)\s*\/\* U+([0-9A-F]{4,6}) (.*) \*\/\s*$/
+ *    /^\#define XK_([a-zA-Z_0-9]+)\s+0x([0-9a-f]+)\s*\/\*\(U+([0-9A-F]{4,6}) (.*)\)\*\/\s*$/
+ *    /^\#define XK_([a-zA-Z_0-9]+)\s+0x([0-9a-f]+)\s*(\/\*\s*(.*)\s*\*\/)?\s*$/
+ *
+ * Before adding new keysyms, please do consider the following: In
+ * addition to the keysym names defined in this file, the
+ * XStringToKeysym() and XKeysymToString() functions will also handle
+ * any keysym string of the form "U0020" to "U007E" and "U00A0" to
+ * "U10FFFF" for all possible Unicode characters. In other words,
+ * every possible Unicode character has already a keysym string
+ * defined algorithmically, even if it is not listed here. Therefore,
+ * defining an additional keysym macro is only necessary where a
+ * non-hexadecimal mnemonic name is needed, or where the new keysym
+ * does not represent any existing Unicode character.
+ *
+ * When adding new keysyms to this file, do not forget to also update the
+ * following:
+ *
+ *   - the mappings in src/KeyBind.c in the repo
+ *     git://anongit.freedesktop.org/xorg/lib/libX11
+ *
+ *   - the protocol specification in specs/XProtocol/X11.keysyms
+ *     in the repo git://anongit.freedesktop.org/xorg/doc/xorg-docs
+ *
+ */

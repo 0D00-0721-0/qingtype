@@ -74,6 +74,7 @@ enum QingTypeRimeIce {
   }
 
   static func installPackage(from source: URL, into directory: URL, provenance: String = "本地方案文件夹", archiveSHA256: String? = nil) throws -> RimeIceInstallation {
+    try QingTypePaths.checkDirectory(directory)
     let manager = FileManager.default
     let root = source.resolvingSymlinksInPath().standardizedFileURL
     guard root != directory.resolvingSymlinksInPath().standardizedFileURL else { throw SettingsError.invalid("请选择方案来源目录，不能选择清言自己的数据目录。") }

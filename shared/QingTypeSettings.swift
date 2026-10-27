@@ -5,6 +5,11 @@ enum QingTypePaths {
   static let userDirectory = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/QingType", isDirectory: true)
   static let reloadNotification = Notification.Name("QingTypeReloadNotification")
+  static func checkDirectory(_ directory: URL) throws {
+    guard (try? directory.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
+      throw SettingsError.invalid("清言数据目录包含符号链接，已停止操作以保护原始文件。")
+    }
+  }
 }
 
 struct QuickPhrase: Codable, Equatable, Identifiable {
@@ -60,6 +65,7 @@ struct QingTypeSettings: Codable, Equatable {
   static let managedHeader = "# Managed by QingType Settings.\n"
 
   static func load(from directory: URL = QingTypePaths.userDirectory) throws -> Self {
+    try QingTypePaths.checkDirectory(directory)
     let url = directory.appendingPathComponent("settings.json")
     guard FileManager.default.fileExists(atPath: url.path) else { return Self() }
     return try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
@@ -191,6 +197,7 @@ struct QingTypeSettings: Codable, Equatable {
   // All files are validated before writing. Restore previous contents if a write fails.
   // Refuse to replace a manually maintained patch without the management header.
   func save(to directory: URL = QingTypePaths.userDirectory) throws {
+    try QingTypePaths.checkDirectory(directory)
     let files = try generatedFiles()
     let manager = FileManager.default
     try manager.createDirectory(at: directory, withIntermediateDirectories: true)

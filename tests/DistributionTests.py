@@ -11,6 +11,17 @@ def info(path):
     return plistlib.loads((path / 'Contents/Info.plist').read_bytes())
 
 outer, inner = info(app), info(payload)
+import json
+for bundle in [app, payload]:
+    resources = bundle / 'Contents/Resources'
+    records = json.loads((resources / 'components.lock.json').read_text())['sourceNoticeRecords']
+    for record in records:
+        notice = resources / 'Licenses' / Path(record['licenseFile']).name
+        assert hashlib.sha256(notice.read_bytes()).hexdigest() == record['sha256']
+    provenance = json.loads((resources / 'BuildInfo.json').read_text())
+    assert len(provenance['sourceCommit']) == 40 and provenance['noticeCount'] == len(records)
+    assert not provenance['explicitRuntimeOverride'], 'Public artifacts must use the pinned runtime'
+    assert '/Users/' not in json.dumps(provenance), 'Build records must not expose developer paths'
 assert outer['CFBundleIdentifier'] == 'org.qingtype.app'
 assert inner['CFBundleIdentifier'] == 'org.qingtype.inputmethod.QingType'
 assert outer['CFBundleShortVersionString'] == inner['CFBundleShortVersionString']

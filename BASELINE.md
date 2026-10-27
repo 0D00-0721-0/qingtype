@@ -1,5 +1,7 @@
 # Phase 0：稳定基线
 
+本文件保留 Phase 0 的历史基线。当前 0.6.0 状态以 PROGRESS.md、VALIDATION.md 与 docs/DEPENDENCIES.md 为准：默认运行库已脱离本机鼠须管，自动学习和 QQ 搜索框有新验收证据。
+
 起点：QingType 0.2.2，提交 `57e3ead`。开始此阶段时 Git 工作区干净。
 
 | 项目 | 已记录版本/来源 |

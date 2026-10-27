@@ -32,3 +32,4 @@ __pycache__/
 *.qinglearning
 .qingtype-data.lock
 .learning-recovery-*/
+*.qingdiagnostics.json

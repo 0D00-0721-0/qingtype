@@ -1,11 +1,11 @@
 # 清言输入法 · QingType
 
 基于 Rime 与鼠须管的开源 macOS 输入法。目标是用 Mac 原生界面完成日常输入、
-自定义词库添加及万象等本地语言模型管理。源码开发版 **0.5.0**，GitHub 下载包仍为 **0.4.0 可安装预览版**，GPL-3.0。
+自定义词库添加及万象等本地语言模型管理。当前版本 **0.6.0 预览版**，GPL-3.0。
 
 ## 使用
 
-[下载 0.4.0 预览版（Apple Silicon）](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.4.0-preview.1)。请下载 Assets 中的 DMG，Source code 为源码。
+[下载 0.6.0 预览版（Apple Silicon / Intel）](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.0-preview.1)。请下载 Assets 中的 DMG，Source code 为源码。
 
 打开 DMG，将「清言.app」拖入「Applications」，再打开清言。
 在「开始使用」点击「安装并启用清言」，完成后点击「切换到清言」或使用系统输入菜单。
@@ -36,6 +36,7 @@
 - **语言模型**：从「开始使用」或「语言模型」页下载官方万象模型并启用，按当前方案选择简体或繁体。
   也保留本地 `.gram` 导入。界面显示实际的编译与模型加载结果。
 - **快捷短语**：编辑字母编码和短语；独立于固定词库与语言模型。
+- **维护与更新**：检查 GitHub 新版、校验并备份更新、默认保留数据的原生卸载，以及不含输入内容的诊断摘要。[维护说明](docs/MAINTENANCE.md)。
 
 清言数据位于 `~/Library/QingType`。模型、词库均复制到清言自己的目录，源文件不作修改。
 用户导入的词库、模型和学习数据不随源代码上传。
@@ -73,6 +74,7 @@ open "build/distribution/清言.app"
 指定的官方 Squirrel 1.1.2 包获取运行库，校验大小和 SHA-256 后解包到被忽略的 `build/runtime`，
 不会安装鼠须管，不读取其用户配置。`QINGTYPE_RUNTIME_APP` 仅用于显式开发覆盖。
 需要 macOS SDK 和 Swift 工具链，可使用 Xcode 或 Command Line Tools。
+运行库逐文件哈希、许可文本和构建来源记录见 [固定依赖说明](docs/DEPENDENCIES.md)。
 构建目标为 macOS 14.0；输出 `build/QingType.app` 输入服务和原生设置，打包生成
 `build/distribution/清言.app` 与 `QingType-<版本>-<架构>.dmg`，包内没有可选模型和个人数据。
 
@@ -93,9 +95,12 @@ open "build/distribution/清言.app"
 详见 `VALIDATION.md`。目前已验证个人词库 CRUD 与文本导入导出、词库导入、全拼／双拼挂载、模型实际加载、
 数据保护和设置迁移。用户已确认基本真实键盘输入。
 
-仍需完成浏览器、微信、Word、VS Code、终端、多显示器和长时间使用测试，
-继续打磨候选窗与苹果拼音的交互差异，并完成词库移除／导出、在线更新、
-第三方分发授权完整审计以及正式发行签名与公证。
+用户已确认 Safari 输入、个人新词及学习重新应用后保留，QQ 搜索框输入正常；
+其他应用、真实多屏/休眠和长时间使用仍待验收，详见 [兼容性矩阵](docs/COMPATIBILITY.md)。
+原生维护功能有隔离失败恢复检查，完整干净 Mac 安装/升级/卸载仍需真实环境。
 
-当前预览版已在 GitHub Release 公开发布。产物采用本地临时签名，已提供 Developer ID 重签与公证脚本，但本机无有效签名身份，未执行正式签名/公证。应用自动更新尚未实现。上游工程和工作流保留供参考；
-开发请使用当前 `scripts/` 脚本。来源见 `THIRD_PARTY.md`，原始说明见 `README.upstream.md`。
+GitHub 预览版采用临时签名，未通过 Apple 公证。Developer ID 重签/公证脚本已提供，
+需真实证书后验证；缺少证书不阻止 GitHub 预览分发。
+发布工作流按固定 tag 在 Apple Silicon 与 Intel runner 构建、检查并附上 DMG/哈希与源码，
+不使用上游 Squirrel 更新服务。第三方运行库的精确源码重建溯源仍有已记录限制。
+来源见 [THIRD_PARTY.md](THIRD_PARTY.md)，原始说明见 [README.upstream.md](README.upstream.md)。

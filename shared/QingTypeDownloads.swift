@@ -68,6 +68,13 @@ enum QingTypeDownloads {
     let release = try await release(repository: repository, tag: tag)
     guard let asset = release.assets.first(where: { $0.name == filename }),
           filename == URL(fileURLWithPath: filename).lastPathComponent else { throw SettingsError.invalid("官方发行中没有找到所需组件。") }
+    return try await download(asset: asset, repository: repository, release: release.tag_name, limit: limit, progress: progress)
+  }
+
+  static func download(asset: QingTypeRelease.Asset, repository: String, release: String, limit: Int64,
+                       progress: @escaping @Sendable (QingTypeTransferProgress) -> Void = { _ in }) async throws -> QingTypeDownloadedAsset {
+    guard ["iDvel/rime-ice", "amzxyz/rime-wanxiang-data", "0D00-0721-0/qingtype"].contains(repository),
+          asset.name == URL(fileURLWithPath: asset.name).lastPathComponent else { throw SettingsError.invalid("未知的下载来源。") }
     let hash = try asset.validate(repository: repository, limit: limit)
     let configuration = URLSessionConfiguration.ephemeral
     configuration.timeoutIntervalForRequest = 60
@@ -87,9 +94,9 @@ enum QingTypeDownloads {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("qingtype-download-\(UUID())")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     do {
-      let target = directory.appendingPathComponent(filename)
+      let target = directory.appendingPathComponent(asset.name)
       try FileManager.default.moveItem(at: file, to: target)
-      return .init(directory: directory, file: target, sha256: hash, release: release.tag_name, repository: repository)
+      return .init(directory: directory, file: target, sha256: hash, release: release, repository: repository)
     } catch { try? FileManager.default.removeItem(at: directory); throw error }
   }
 }

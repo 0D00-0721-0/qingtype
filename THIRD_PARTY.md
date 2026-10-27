@@ -12,8 +12,12 @@ and GPL-3.0 license are preserved in the source and `LICENSE.txt`.
   `614746013212937623d5bbab9901e9c43d1ec937aa32307d6b6092a05e308287`.
   The preview bundles librime, plugins and standard resources; legacy optional
   `.gram` files are excluded. GPL, librime BSD, Yams MIT and Xiaohe license texts
-  are included. The full transitive binary/plugin/data permission audit remains a
-  requirement before public release. Explicit developer overrides are recorded
+  are included, together with 16 additional checked notice files in `licenses/`.
+  `dependencies/components.lock.json` records their fixed source revisions and
+  SHA-256; `runtime-files.lock.json` checks every extracted runtime/resource file.
+  Exact binary-to-source rebuild provenance is not yet established: the PKG and
+  same-version SDK have different UUIDs and Lua patch versions. See
+  [dependency evidence and limits](docs/DEPENDENCIES.md). Explicit developer overrides are recorded
   by `capture-baseline.py` and are not the default distribution source.
 - **Xiaohe double pinyin schema**: vendored from
   [rime/rime-double-pinyin](https://github.com/rime/rime-double-pinyin), commit
@@ -25,7 +29,7 @@ and GPL-3.0 license are preserved in the source and `LICENSE.txt`.
 The build does not use Squirrel's update feed. DMG preview packaging and optional
 Developer ID/notarization scripts exist; no valid identity was available locally,
 so signing with Developer ID and notarization have not been performed. There is
-no public app updater. A clearly marked, unnotarized preview is published through
+an opt-in GitHub app updater in 0.6.0. A clearly marked, unnotarized preview is published through
 GitHub Releases; this does not represent Apple notarization or stable-release acceptance.
 
 - **Squirrel Panel**: package-manifest, schema-level grammar configuration and
@@ -35,8 +39,7 @@ GitHub Releases; this does not represent Apple notarization or stable-release ac
   and deployment report are independently implemented for its dedicated data directory.
 - **Yams 5.0.6**: MIT, pinned to
   `0d9ee7ea8c4ebd4a489ad7a73d5c6cad55d6fed3` in `dependencies/Package.resolved`.
-  Its license is bundled with both applications. See the upstream package for
-  the included libyaml source and its copyright notices.
+  Its license and libyaml's MIT notice are bundled with both applications.
 - **Wanxiang model**: optional official download or local import, not bundled.
   The former RIME-LMDG repository now resolves to
   [amzxyz/rime-wanxiang-data](https://github.com/amzxyz/rime-wanxiang-data), whose
@@ -46,6 +49,17 @@ GitHub Releases; this does not represent Apple notarization or stable-release ac
   model tested on 2026-10-27 had SHA-256
   `e34500ab44626dc039a0641792ecba98ab63307646eb3d29186be56608ffe094`.
   No user's existing model, word entries or learning databases are redistributed.
+
+- **Runtime plugins and transitive libraries**: `librime-lua` (BSD-3-Clause;
+  embedded Lua 5.4.6, MIT), `librime-octagram` (GPL-3.0), `librime-predict`
+  (BSD-3-Clause), glog and LevelDB (BSD-3-Clause), yaml-cpp (MIT), marisa
+  (BSD-2-Clause option), OpenCC (Apache-2.0), Boost/utf8cpp (Boost Software
+  License), Darts-clone (BSD), and X11 keysyms (permissive notices).
+  Their source references and full notice text hashes are in
+  `dependencies/components.lock.json`; the exact PKG bytes remain the runtime
+  distribution source. Squirrel's build recipe and the Rime SDK provide plugin
+  revision evidence, not byte-equivalence to the PKG. GPL octagram source recipe:
+  [dfcc151](https://github.com/lotem/librime-octagram/tree/dfcc15115788c828d9dd7b4bff68067d3ce2ffb8).
 
 - **Input-source cache diagnosis**: the macOS per-application keyboard cache
   repair was independently corroborated by
