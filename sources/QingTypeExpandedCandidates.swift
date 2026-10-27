@@ -21,6 +21,37 @@ enum QingTypeCandidateMetrics {
   static let chromeWidth = leading * 2 + accessoryWidth
 }
 
+// The native expanded panel is a six-column grid. Long candidates occupy more
+// than one column, so a first row may contain three complete phrases, not six
+// truncated cells. Its width is independent of the collapsed page's word lengths.
+private struct ExpandedCandidateLayout {
+  struct Item {
+    var frame: NSRect
+    var row: Int
+  }
+  var width: CGFloat
+  var items: [Item] = []
+  var headerCount: Int { items.prefix { $0.row == 0 }.count }
+  var bodyRows: Int { items.last?.row ?? 0 }
+
+  init(candidates: [QingTypeCandidate], pointSize: CGFloat, rowHeight: CGFloat, maxWidth: CGFloat) {
+    width = min(maxWidth, max(360, 6 * (2 * pointSize + 29.5) + QingTypeCandidateMetrics.chromeWidth))
+    // Half-point boundaries are exact in binary and avoid fractional-metric
+    // overlap with the chevron while matching the 2x reference's column spacing.
+    let cellWidth = floor((width - QingTypeCandidateMetrics.chromeWidth) / 6 * 2) / 2
+    var row = 0
+    var column = 0
+    for candidate in candidates {
+      let textWidth = (candidate.text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: pointSize)]).width
+      let span = min(6, max(1, Int(ceil((textWidth + 25) / max(1, cellWidth)))))
+      if column + span > 6 { row += 1; column = 0 }
+      items.append(Item(frame: NSRect(x: QingTypeCandidateMetrics.leading + CGFloat(column) * cellWidth,
+                                     y: CGFloat(row) * rowHeight, width: CGFloat(span) * cellWidth, height: rowHeight), row: row))
+      column += span
+    }
+  }
+}
+
 // IMKTextInput's line rectangle and NSWindow frames both use Cocoa screen
 // coordinates. Never combine an IMKCandidates frame with a second window.
 enum QingTypeCandidatePlacement {
@@ -150,11 +181,13 @@ final class QingTypeExpandedCandidates: NSPanel {
   private var caretRect = NSRect.zero
   private var renderedCandidates: [QingTypeCandidate] = []
   private var renderedStyle = ""
+  private var expandedLayout: ExpandedCandidateLayout?
   private(set) var columns = 6
   private(set) var selectedIndex = 0
   private(set) var hasMoreCandidates = false
   private(set) var toggleFrame = NSRect.zero
   private(set) var cellFrames: [NSRect] = []
+  private(set) var allCellFrames: [NSRect] = []
   var scrollOrigin: NSPoint { scroll.contentView.bounds.origin }
   var bodyIdentity: ObjectIdentifier? { scroll.documentView.map(ObjectIdentifier.init) }
 
@@ -197,13 +230,13 @@ final class QingTypeExpandedCandidates: NSPanel {
     let chromeWidth = QingTypeCandidateMetrics.chromeWidth
     var width = min(maxWidth, widths.reduce(chromeWidth, +))
     if vertical { width = min(maxWidth, max(160, (widths.max() ?? 100) + chromeWidth)) }
-    if expanded { width = min(maxWidth, max(360, width)) }
-    // Whole-point column boundaries also stay disjoint from the chevron when
-    // a different system font returns fractional glyph widths.
-    let gridCellWidth = floor((width - chromeWidth) / 6)
+    let grid = expanded ? ExpandedCandidateLayout(candidates: candidates, pointSize: pointSize, rowHeight: rowHeight, maxWidth: maxWidth) : nil
+    expandedLayout = grid
+    if let grid { width = grid.width }
     columns = expanded ? 6 : (vertical ? 1 : row.count)
-    hasMoreCandidates = candidates.count > row.count
-    let bodyRows = expanded ? Int(ceil(Double(max(0, candidates.count - columns)) / Double(columns))) : 0
+    let headerCount = grid?.headerCount ?? row.count
+    hasMoreCandidates = candidates.count > headerCount
+    let bodyRows = grid?.bodyRows ?? 0
     let bodyHeight = min(CGFloat(min(4, bodyRows)) * rowHeight, max(0, screen.height - rowHeight - 12))
     let inset = QingTypeCandidateMetrics.verticalInset
     let height = (expanded ? rowHeight + bodyHeight : (vertical ? rowHeight * CGFloat(row.count) : rowHeight)) + inset * 2
@@ -211,7 +244,7 @@ final class QingTypeExpandedCandidates: NSPanel {
     if self.frame != frame { setFrame(frame, display: false) }
     appearance = NSApp.effectiveAppearance
     setAccessibilityLabel(expanded ? "展开的清言候选" : "清言候选")
-    let style = "\(fontSize):\(pageSize):\(expanded):\(vertical):\(pageStart):\(width)"
+    let style = "\(fontSize):\(pageSize):\(expanded):\(vertical):\(pageStart):\(width):\(height)"
     let rebuild = renderedCandidates != candidates || renderedStyle != style
     if rebuild {
       renderedCandidates = candidates
@@ -237,8 +270,9 @@ final class QingTypeExpandedCandidates: NSPanel {
       if expanded { background.addSubview(scroll) }
       cells = []
       cellFrames = []
+      allCellFrames = []
       let displayed = expanded ? candidates : row
-      numberedCandidates = Array(displayed.prefix(expanded ? columns : self.pageSize))
+      numberedCandidates = Array(displayed.prefix(headerCount))
       if !expanded && !vertical {
         let available = width - chromeWidth
         let total = widths.reduce(0, +)
@@ -247,12 +281,10 @@ final class QingTypeExpandedCandidates: NSPanel {
       let leading = QingTypeCandidateMetrics.leading
       var x = leading
       for (index, candidate) in displayed.enumerated() {
-        let inHeader = !expanded || index < columns
-        let local = inHeader ? index : index - columns
+        let inHeader = !expanded || index < headerCount
         let cell = CandidateCell(candidate: candidate, number: inHeader ? index + 1 : nil, pointSize: pointSize)
-        if expanded {
-          cell.frame = NSRect(x: leading + CGFloat(local % columns) * gridCellWidth, y: CGFloat(local / columns) * rowHeight,
-                              width: gridCellWidth, height: rowHeight)
+        if let grid {
+          cell.frame = grid.items[index].frame.offsetBy(dx: 0, dy: inHeader ? 0 : -rowHeight)
         } else if vertical {
           cell.frame = NSRect(x: leading, y: CGFloat(index) * rowHeight, width: width - chromeWidth, height: rowHeight)
         } else {
@@ -263,6 +295,7 @@ final class QingTypeExpandedCandidates: NSPanel {
         cell.onHover = { [weak self] index in self?.highlight(index, scrollToSelection: false) }
         (inHeader ? header : body).addSubview(cell)
         cells.append(cell)
+        allCellFrames.append(cell.frame.offsetBy(dx: 0, dy: inset + (inHeader ? 0 : rowHeight)))
         if inHeader { cellFrames.append(cell.frame.offsetBy(dx: 0, dy: inset)) }
       }
       toggleFrame = .zero
@@ -312,8 +345,16 @@ final class QingTypeExpandedCandidates: NSPanel {
 
   func move(horizontal: Int, vertical: Int) {
     guard let offset = candidates.firstIndex(where: { $0.index == selectedIndex }) else { return }
-    let step = expanded ? columns : (self.vertical ? 1 : max(1, columns))
-    let next = min(candidates.count - 1, max(0, offset + horizontal + vertical * step))
+    if let grid = expandedLayout, vertical != 0 {
+      let current = grid.items[offset]
+      let row = current.row + vertical
+      let options = grid.items.indices.filter { grid.items[$0].row == row }
+      if let next = options.min(by: { abs(grid.items[$0].frame.midX - current.frame.midX) < abs(grid.items[$1].frame.midX - current.frame.midX) }) {
+        highlight(candidates[next].index)
+      }
+      return
+    }
+    let next = min(candidates.count - 1, max(0, offset + horizontal + vertical * (self.vertical ? 1 : max(1, columns))))
     highlight(candidates[next].index)
   }
   func pickSelected() {

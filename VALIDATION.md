@@ -1,8 +1,28 @@
-# Local validation — 2026-10-27 — QingType 0.4.1
+# Local validation — 2026-10-27 — QingType 0.4.2
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
+
+## Expanded long-candidate layout — 0.4.2
+
+The user's longer-input comparison exposed a gap in the earlier ni acceptance:
+six equal-width expanded cells truncated whole phrases, while the native panel
+lets long candidates span columns. Expanded width also followed the collapsed
+page's total width. The six-column grid now assigns spans from measured text
+width, wraps in engine order, and uses a bounded independent width (397 pt at
+16 pt font). Number keys address only the candidates actually in the first row;
+vertical navigation follows the next visual row. The single window, background,
+candidate contents/order, page-size preference and absence of a footer remain.
+
+193 local checks pass, including 24 candidate checks. Six new cases exercise
+complete long header/body text, three long phrases in the first row, ordered
+body wrapping, actual first-row numbering and visual-row navigation. The AppKit
+long-phrase preview is 794 x 282 px. Rebuilt DMG mounting and offline-engine
+checks pass. Native installation verifies 0.4.2, deployment/model load and all
+existing settings unchanged; both installed app payloads match the built binary.
+Actual long-input expansion and pushed-head CI are still pending. Evidence is
+in ignored build/expanded-spans-*.log and expanded-spans-preview.png.
 
 ## Native candidate geometry — 0.4.1
 

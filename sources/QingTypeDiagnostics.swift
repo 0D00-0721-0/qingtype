@@ -25,7 +25,7 @@ enum QingTypeDiagnostics {
 
     var settings = QingTypeSettings()
     settings.pageSize = 7
-    let values = (100..<164).map { QingTypeCandidate(index: $0, text: "词\($0)") }
+    let values = (100..<164).map { QingTypeCandidate(index: $0, text: "词条") }
     let presenter = QingTypeCandidatePresenter(showsWindow: false)
     let identity = ObjectIdentifier(presenter.window)
     let caret = NSRect(x: 300, y: 500, width: 1, height: 24)
@@ -67,6 +67,28 @@ enum QingTypeDiagnostics {
     expect(presenter.handleKey(code: 22, text: "6") && picked == 105, "expanded number keys select the fixed first row")
     presenter.hide()
     expect(!presenter.isExpanded && !presenter.handleKey(code: 49, text: " "), "hidden candidates do not consume typing")
+    let phrases = ["发信魔性了吗", "发信模型了吗", "发信魔性了嘛", "发信模型了嘛", "发", "发信", "法", "发薪"] + Array(repeating: "词", count: 30)
+    presenter.update(candidates: phrases.enumerated().map { QingTypeCandidate(index: $0.offset + 200, text: $0.element) },
+                     highlighted: 200, settings: settings, caretRect: caret, composition: "faxinmoxinglema")
+    presenter.expand()
+    expect(window.frame.width == 397 && window.cellFrames.count == 3,
+           "long phrases use three complete spans in a bounded native-width first row")
+    let phraseWidth = (phrases[0] as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 16)]).width
+    expect(window.cellFrames[0].width - 18 >= phraseWidth && window.allCellFrames[3].width - 18 >= phraseWidth,
+           "long header and body phrases fit without truncation into a single short cell")
+    expect(window.allCellFrames[3].minY == window.allCellFrames[4].minY &&
+           window.allCellFrames[7].minY == window.allCellFrames[3].minY && window.allCellFrames[8].minY > window.allCellFrames[7].minY,
+           "the body wraps variable spans at six columns and preserves engine order")
+    picked = nil
+    expect(presenter.handleKey(code: 20, text: "3") && picked == 202 && !presenter.handleKey(code: 21, text: "4"),
+           "expanded numbers address only the three actually displayed first-row phrases")
+    window.highlight(200)
+    window.move(horizontal: 0, vertical: 1)
+    expect(window.selectedIndex == 203, "Down follows the next visual row when candidates span columns")
+    window.move(horizontal: 0, vertical: -1)
+    expect(window.selectedIndex == 200 && !window.cellFrames.contains(where: { $0.intersects(window.toggleFrame) }),
+           "Up returns to the aligned phrase and spanning headers cannot overlap the chevron")
+    presenter.hide()
     print("PASS: \(passed.count) candidate placement and interaction checks")
     passed.forEach { print("PASS: \($0)") }
     return true
@@ -186,7 +208,9 @@ enum QingTypeDiagnostics {
     let app = NSApplication.shared
     app.setActivationPolicy(.regular)
     let panel = QingTypeExpandedCandidates()
-    let words = ["你好", "妳好", "逆号", "拟好", "你", "拟", "尼", "呢", "妮", "倪", "泥", "霓", "昵", "腻", "匿", "铌", "怩", "睨", "溺", "鲵", "旎", "祢", "猊", "倪", "麑", "薿", "輗", "蜺", "伲", "坭", "你们", "拟定", "逆向", "泥土", "你好啊", "你好呀"]
+    let words = CommandLine.arguments.contains("--sample-long")
+      ? ["发信魔性了吗", "发信模型了吗", "发信魔性了嘛", "发信模型了嘛", "发", "发信", "法", "发薪", "罚", "伐", "乏", "阀", "阀芯", "珐", "発", "髮", "筏", "砝", "垡", "發", "廢", "撥", "髪", "罰", "眨", "閥", "泛", "凡", "烦", "翻", "繁", "帆"]
+      : ["你好", "妳好", "逆号", "拟好", "你", "拟", "尼", "呢", "妮", "倪", "泥", "霓", "昵", "腻", "匿", "铌", "怩", "睨", "溺", "鲵", "旎", "祢", "猊", "倪", "麑", "薿", "輗", "蜺", "伲", "坭", "你们", "拟定", "逆向", "泥土", "你好啊", "你好呀"]
     let candidates = words.enumerated().map { QingTypeCandidate(index: $0.offset, text: $0.element) }
     panel.onPick = { index in
       print("Selected candidate index: \(index)")
@@ -197,7 +221,7 @@ enum QingTypeDiagnostics {
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
       let screen = NSScreen.main!.visibleFrame
       let anchor = NSRect(x: screen.midX - 200, y: screen.midY + 100, width: 400, height: 28)
-      panel.present(candidates: candidates, highlighted: 0, caretRect: anchor, fontSize: 18, pageSize: 7, expanded: true)
+      panel.present(candidates: candidates, highlighted: 0, caretRect: anchor, fontSize: 16, pageSize: 7, expanded: true)
       if let flag = CommandLine.arguments.firstIndex(of: "--capture"), CommandLine.arguments.count > flag + 1 {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
           if let view = panel.contentView, let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
