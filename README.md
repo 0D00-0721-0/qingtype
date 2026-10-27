@@ -97,6 +97,7 @@ open "build/distribution/清言.app"
 
 安装到 `~/Library/Input Methods/QingType.app`。卸载脚本将程序移到废纸篓，保留用户数据。
 更新前的程序备份保存为 ZIP，避免备份内的同名 app 被系统重复注册。
+安装器先验证并暂存完整程序，以目录交换方式升级，确认系统输入源启用后才清理旧目录；失败时尝试恢复程序、原输入源状态和缓存，并报告无法确认的恢复。安装操作使用本地锁，防止并发替换。
 安装器会备份并移走系统输入源缓存，再刷新注册，处理沙盒应用仍使用旧输入源表的问题。
 只处理 `com.apple.IntlDataCache.le` / `.le.kbdx`，备份在本地 `build/install-backups/`。
 
