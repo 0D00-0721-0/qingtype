@@ -1,4 +1,4 @@
-# Local validation — 2026-10-27 — QingType 0.6.0
+# Local validation — 2026-10-27 — QingType 0.6.1
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
@@ -57,6 +57,27 @@ receipt. Real installed-program uninstall was not exercised. A final recovery
 ordering fix releases the profile lock before reselecting the restored input
 source; build, 26 maintenance and 32 learning-lock checks passed. The tagged
 release workflow will rerun full checks on all three supported systems. This machine still has zero valid signing identities.
+
+## Published artifact and tagged workflow
+
+v0.6.1-preview.1 points to fffae68ec5b6c99d864ef4033865f8603d2b39c2.
+The tagged release workflow 40509068950 passed all macOS 14/15/26 Apple Silicon
+jobs and published the arm64 DMG, portable hash file and source archive. The
+initial macOS 14 attempt passed functional tests but could not detach its test
+image (busy status 16); rerunning the failed job passed. A later main-only test
+cleanup improvement retries that transient status without force-detaching.
+
+DMG SHA-256: 5c4c1ca2d3b74ee34b33b91eb3bc78fd4555c1f52324564a010fa897adc43ae6,
+16,633,842 bytes. Server digest matches the verified CI artifact installed locally.
+The native installer and production normal-app replacement transaction preserve
+all settings, verify deployment/model loading and a previous-program ZIP hash.
+Both installed bundles have clean tagged BuildInfo; their payload bytes match.
+The final normal application was opened successfully. The published source hash,
+GPL plus 16 notices and private-data exclusion were verified. The app downloader
+also fetched/verified the public 0.6.1 DMG and nested signatures without installing
+another copy. The unauthenticated GitHub API hit shared-egress rate limits after
+an initial native update check; authenticated developer metadata was used solely
+to test downloading, with no token embedded in the app.
 
 ## Rime learning, persistence and recovery — 0.5.0
 
