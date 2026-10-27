@@ -19,6 +19,46 @@ enum QingTypeCandidateMetrics {
   static let caretGap: CGFloat = 6
   static let accessoryWidth: CGFloat = 26
   static let chromeWidth = leading * 2 + accessoryWidth
+  static func nativeWidth(pointSize: CGFloat) -> CGFloat {
+    max(360, 6 * (2 * pointSize + 29.5) + chromeWidth)
+  }
+}
+
+// A configured page size is an upper bound. Apple Pinyin keeps long phrases
+// intact and displays fewer choices, rather than shrinking every cell to fit.
+private struct CollapsedCandidateLayout {
+  var start = 0
+  var candidates: [QingTypeCandidate] = []
+  var widths: [CGFloat] = []
+  var width: CGFloat = 0
+
+  init(candidates: [QingTypeCandidate], highlighted: Int, pointSize: CGFloat, pageSize: Int, screenWidth: CGFloat) {
+    let chrome = QingTypeCandidateMetrics.chromeWidth
+    let natural = candidates.map { max(36, ceil(($0.text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: pointSize)]).width) + 25) }
+    let selected = candidates.firstIndex { $0.index == highlighted } ?? 0
+    var cursor = 0
+    while cursor < candidates.count {
+      // A single phrase wider than the usual capsule can use more of the
+      // screen. It must never be forced into the old 180-point cell cap.
+      let limit = min(screenWidth, max(QingTypeCandidateMetrics.nativeWidth(pointSize: pointSize), natural[cursor] + chrome))
+      var end = cursor
+      var total = chrome
+      while end < candidates.count && end - cursor < pageSize {
+        let cell = min(natural[end], max(0, limit - chrome))
+        if end > cursor && total + cell > limit { break }
+        total += cell
+        end += 1
+      }
+      if selected < end {
+        start = cursor
+        self.candidates = Array(candidates[cursor..<end])
+        widths = Array(natural[cursor..<end]).map { min($0, max(0, limit - chrome)) }
+        width = end < min(candidates.count, cursor + pageSize) ? limit : total
+        return
+      }
+      cursor = end
+    }
+  }
 }
 
 // The native expanded panel is a six-column grid. Long candidates occupy more
@@ -35,7 +75,7 @@ private struct ExpandedCandidateLayout {
   var bodyRows: Int { items.last?.row ?? 0 }
 
   init(candidates: [QingTypeCandidate], pointSize: CGFloat, rowHeight: CGFloat, maxWidth: CGFloat) {
-    width = min(maxWidth, max(360, 6 * (2 * pointSize + 29.5) + QingTypeCandidateMetrics.chromeWidth))
+    width = min(maxWidth, QingTypeCandidateMetrics.nativeWidth(pointSize: pointSize))
     // Half-point boundaries are exact in binary and avoid fractional-metric
     // overlap with the chevron while matching the 2x reference's column spacing.
     let cellWidth = floor((width - QingTypeCandidateMetrics.chromeWidth) / 6 * 2) / 2
@@ -223,12 +263,14 @@ final class QingTypeExpandedCandidates: NSPanel {
       ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
     let maxWidth = min(600, screen.width)
     let offset = candidates.firstIndex { $0.index == highlighted } ?? 0
-    let pageStart = expanded ? 0 : offset / self.pageSize * self.pageSize
-    let row = Array(candidates.dropFirst(pageStart).prefix(self.pageSize))
-    var widths = row.map { min(180, max(36, ($0.text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: pointSize)]).width + 25)) }
+    let compact = CollapsedCandidateLayout(candidates: candidates, highlighted: highlighted, pointSize: pointSize,
+                                           pageSize: self.pageSize, screenWidth: screen.width)
+    let pageStart = expanded ? 0 : vertical ? offset / self.pageSize * self.pageSize : compact.start
+    let row = vertical ? Array(candidates.dropFirst(pageStart).prefix(self.pageSize)) : compact.candidates
+    let widths = vertical ? row.map { max(36, ($0.text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: pointSize)]).width + 25) } : compact.widths
     // Reserve the chevron's entire hit region, even for the last candidate.
     let chromeWidth = QingTypeCandidateMetrics.chromeWidth
-    var width = min(maxWidth, widths.reduce(chromeWidth, +))
+    var width = compact.width
     if vertical { width = min(maxWidth, max(160, (widths.max() ?? 100) + chromeWidth)) }
     let grid = expanded ? ExpandedCandidateLayout(candidates: candidates, pointSize: pointSize, rowHeight: rowHeight, maxWidth: maxWidth) : nil
     expandedLayout = grid
@@ -273,11 +315,6 @@ final class QingTypeExpandedCandidates: NSPanel {
       allCellFrames = []
       let displayed = expanded ? candidates : row
       numberedCandidates = Array(displayed.prefix(headerCount))
-      if !expanded && !vertical {
-        let available = width - chromeWidth
-        let total = widths.reduce(0, +)
-        if total > available { widths = widths.map { $0 * available / total } }
-      }
       let leading = QingTypeCandidateMetrics.leading
       var x = leading
       for (index, candidate) in displayed.enumerated() {

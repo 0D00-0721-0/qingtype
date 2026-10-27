@@ -82,8 +82,11 @@ final class QingTypeCandidatePresenter {
       window.pickSelected()
     case 49: window.pickSelected()
     default:
-      guard let text, text.count == 1, let number = Int(text) else { return false }
-      return window.pickNumber(number)
+      guard let text, text.count == 1, let number = Int(text), (1...9).contains(number) else { return false }
+      // Never let Rime select a hidden page entry after adaptive layout has
+      // reduced the number of visible choices. Unavailable digits are ignored.
+      _ = window.pickNumber(number)
+      return true
     }
     highlighted = window.selectedIndex
     return true

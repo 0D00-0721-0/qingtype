@@ -4,6 +4,25 @@ Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+## Long collapsed candidates — 0.6.1
+
+The user reported a long first candidate ending in an ellipsis and supplied an Apple
+Pinyin reference that reduced the visible row to three choices. The old 180pt cell
+cap and proportional whole-row shrink were removed. Collapsed rows now pack complete
+natural-width cells into the native reference width; the configured page size is
+an upper bound. Later rows and number shortcuts follow actual visible absolute
+indices. Expanded layout, dictionaries, models and ranking are unchanged.
+
+All regression and DMG checks passed; candidate checks increased from 24 to 29,
+covering full long text, fewer choices, arrow separation, visible numbering and
+expand/collapse page mapping. The same reference phrase rendered fully with three
+choices in an actual AppKit static capture. User then repeated the original input after native 0.6.1 installation and explicitly
+confirmed the complete first phrase and reduced visible count. This accepts that
+scenario, not every application. Unavailable number shortcuts are consumed before
+Rime can select a hidden candidate.
+User additionally narrowed support to Apple Silicon only; Intel CI/distribution
+was removed. Previous 0.6.0 CI 40505797749 passed, but does not cover this fix.
+
 ## Maintenance, provenance and compatibility — 0.6.0
 
 The full scripts/test.sh regression and mounted DMG DistributionTests passed locally.
@@ -29,7 +48,7 @@ and bundles notices plus source commit/clean state/architecture/toolchain proven
 The official Squirrel PKG differs from the matching Rime SDK in Mach-O UUID and Lua
 patch version; SDK plugin revisions are recipe evidence, not byte-equivalence proof.
 This remaining source rebuild audit is explicit in docs/DEPENDENCIES.md.
-Multi-system/Intel remote CI and native installation/UI results will be recorded
+Multi-system Apple Silicon remote CI and native installation/UI results will be recorded
 in PROGRESS.md after completion. This machine still has zero valid signing identities.
 
 ## Rime learning, persistence and recovery — 0.5.0

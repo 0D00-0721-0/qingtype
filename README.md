@@ -1,11 +1,11 @@
 # 清言输入法 · QingType
 
 基于 Rime 与鼠须管的开源 macOS 输入法。目标是用 Mac 原生界面完成日常输入、
-自定义词库添加及万象等本地语言模型管理。当前版本 **0.6.0 预览版**，GPL-3.0。
+自定义词库添加及万象等本地语言模型管理。当前版本 **0.6.1 预览版**，GPL-3.0。
 
 ## 使用
 
-[下载 0.6.0 预览版（Apple Silicon / Intel）](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.0-preview.1)。请下载 Assets 中的 DMG，Source code 为源码。
+[下载 0.6.1 预览版（M 芯片 Mac）](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.1-preview.1)。请下载 Assets 中的 DMG，Source code 为源码。
 
 打开 DMG，将「清言.app」拖入「Applications」，再打开清言。
 在「开始使用」点击「安装并启用清言」，完成后点击「切换到清言」或使用系统输入菜单。
@@ -75,7 +75,7 @@ open "build/distribution/清言.app"
 不会安装鼠须管，不读取其用户配置。`QINGTYPE_RUNTIME_APP` 仅用于显式开发覆盖。
 需要 macOS SDK 和 Swift 工具链，可使用 Xcode 或 Command Line Tools。
 运行库逐文件哈希、许可文本和构建来源记录见 [固定依赖说明](docs/DEPENDENCIES.md)。
-构建目标为 macOS 14.0；输出 `build/QingType.app` 输入服务和原生设置，打包生成
+仅支持 M 芯片 Mac，构建目标为 macOS 14.0；输出 `build/QingType.app` 输入服务和原生设置，打包生成
 `build/distribution/清言.app` 与 `QingType-<版本>-<架构>.dmg`，包内没有可选模型和个人数据。
 
 ```sh
@@ -101,6 +101,6 @@ open "build/distribution/清言.app"
 
 GitHub 预览版采用临时签名，未通过 Apple 公证。Developer ID 重签/公证脚本已提供，
 需真实证书后验证；缺少证书不阻止 GitHub 预览分发。
-发布工作流按固定 tag 在 Apple Silicon 与 Intel runner 构建、检查并附上 DMG/哈希与源码，
+发布工作流按固定 tag 在 Apple Silicon runner 构建、检查并附上 DMG/哈希与源码，
 不使用上游 Squirrel 更新服务。第三方运行库的精确源码重建溯源仍有已记录限制。
 来源见 [THIRD_PARTY.md](THIRD_PARTY.md)，原始说明见 [README.upstream.md](README.upstream.md)。

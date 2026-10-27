@@ -59,7 +59,7 @@ enum QingTypeDiagnostics {
     expect(presenter.handleKey(code: 53, text: nil) && !presenter.isExpanded && window.selectedIndex == 137,
            "Escape collapses without losing the selected candidate")
     picked = nil
-    expect(presenter.handleKey(code: 19, text: "2") && picked == 136, "collapsed number selection maps to the visible page after collapse")
+    expect(presenter.handleKey(code: 19, text: "2") && picked == 137, "collapsed number selection maps to the adaptive visible page after collapse")
     presenter.update(candidates: values, highlighted: 100, settings: settings, caretRect: caret, composition: "cian")
     expect(window.selectedIndex == 100, "editing composition resets stale UI selection")
     presenter.expand()
@@ -80,14 +80,34 @@ enum QingTypeDiagnostics {
            window.allCellFrames[7].minY == window.allCellFrames[3].minY && window.allCellFrames[8].minY > window.allCellFrames[7].minY,
            "the body wraps variable spans at six columns and preserves engine order")
     picked = nil
-    expect(presenter.handleKey(code: 20, text: "3") && picked == 202 && !presenter.handleKey(code: 21, text: "4"),
-           "expanded numbers address only the three actually displayed first-row phrases")
+    expect(presenter.handleKey(code: 20, text: "3") && picked == 202 && presenter.handleKey(code: 21, text: "4") && picked == 202,
+           "expanded numbers address only visible phrases and consume unavailable digits before Rime")
     window.highlight(200)
     window.move(horizontal: 0, vertical: 1)
     expect(window.selectedIndex == 203, "Down follows the next visual row when candidates span columns")
     window.move(horizontal: 0, vertical: -1)
     expect(window.selectedIndex == 200 && !window.cellFrames.contains(where: { $0.intersects(window.toggleFrame) }),
            "Up returns to the aligned phrase and spanning headers cannot overlap the chevron")
+    presenter.hide()
+    let compactWords = ["你带大舅爱戴是大舅爱大舅爱的", "你带的", "你", "你好", "妳好", "逆号", "拟好", "尼"]
+    presenter.update(candidates: compactWords.enumerated().map { .init(index: 300 + $0.offset, text: $0.element) },
+                     highlighted: 300, settings: settings, caretRect: caret, composition: "nidaidajaidaisdjaidjaid")
+    let fullWidth = (compactWords[0] as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 16)]).width
+    expect(window.cellFrames.count < settings.pageSize && window.cellFrames[0].width - 18 >= fullWidth,
+           "collapsed long phrase stays complete by reducing visible candidate count instead of adding an ellipsis")
+    expect(window.frame.width <= QingTypeCandidateMetrics.nativeWidth(pointSize: 16) &&
+           !window.cellFrames.contains(where: { $0.intersects(window.toggleFrame) }),
+           "adaptive collapsed row keeps the native width and separate arrow")
+    picked = nil
+    expect(presenter.handleKey(code: 19, text: "2") && picked == 301 &&
+           presenter.handleKey(code: 26, text: "7") && picked == 301, "hidden compact candidates cannot be selected by falling through to Rime")
+    presenter.expand(); presenter.collapse()
+    expect(window.cellFrames[0].width - 18 >= fullWidth && !presenter.isExpanded,
+           "expand then collapse preserves the complete long first candidate")
+    window.highlight(306)
+    picked = nil
+    expect(presenter.handleKey(code: 18, text: "1") && picked != 300 && picked != nil,
+           "collapsing onto a later adaptive page maps its numbers to visible absolute indices")
     presenter.hide()
     print("PASS: \(passed.count) candidate placement and interaction checks")
     passed.forEach { print("PASS: \($0)") }
@@ -238,14 +258,17 @@ enum QingTypeDiagnostics {
   static func showSystemPreview() {
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
-    let panel = QingTypeCandidatePresenter()
+    let panel = QingTypeCandidatePresenter(showsWindow: !CommandLine.arguments.contains("--capture"))
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
       var settings = (try? QingTypeSettings.load()) ?? QingTypeSettings()
       if let flag = CommandLine.arguments.firstIndex(of: "--preview-font"), CommandLine.arguments.count > flag + 1,
          let size = Int(CommandLine.arguments[flag + 1]), (12...32).contains(size) { settings.fontSize = size }
-      let words = CommandLine.arguments.contains("--sample-ni")
-        ? ["你", "拟", "尼", "泥", "呢", "妳", "妮", "倪", "霓", "昵", "腻", "匿", "铌"]
-        : ["你好", "拟好", "你", "呢", "泥", "妳", "倪", "霓", "昵", "腻", "匿", "铌"]
+      let words: [String]
+      if CommandLine.arguments.contains("--sample-native-long") {
+        words = ["你带大舅爱戴是大舅爱大舅爱的", "你带的", "你", "你好", "妳好", "逆号", "拟好", "尼"]
+      } else if CommandLine.arguments.contains("--sample-ni") {
+        words = ["你", "拟", "尼", "泥", "呢", "妳", "妮", "倪", "霓", "昵", "腻", "匿", "铌"]
+      } else { words = ["你好", "拟好", "你", "呢", "泥", "妳", "倪", "霓", "昵", "腻", "匿", "铌"] }
       panel.update(candidates: words.enumerated().map { QingTypeCandidate(index: $0.offset, text: $0.element) },
                    highlighted: 0, settings: settings,
                    caretRect: NSRect(x: NSScreen.main!.frame.midX - 150, y: NSScreen.main!.frame.midY, width: 1, height: 24))

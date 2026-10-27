@@ -31,7 +31,7 @@ version-info.txt 记录上述插件 revision。这些是上游配方来源，不
 
 ## 构建环境
 
-macOS 14+，Xcode 或含合适 macOS SDK/Swift 的 Command Line Tools，Git、Python 3。
+M 芯片 Mac、macOS 14+、Xcode 或含合适 macOS SDK/Swift 的 Command Line Tools，Git、Python 3。
 执行 `git submodule update --init --depth 1 librime` 获取固定 API；Yams 由 SwiftPM 依据
 Package.resolved 获取。不需要将上游 Squirrel、Sparkle 或用户词库安装到本机。
 
@@ -42,8 +42,8 @@ Package.resolved 获取。不需要将上游 Squirrel、Sparkle 或用户词库�
 python3 tests/DistributionTests.py
 ```
 
-默认按宿主处理器编译，运行库为 universal；CI 在多个 macOS 与 Intel runner 构建和测试。
-Intel 的 CI 不等于真人 Intel Mac 的图形验收。
+用户明确仅支持 M 芯片 Mac；构建入口拒绝 x86_64 宿主，预览只发布 arm64。
+固定上游运行库本身为 universal，清言主程序编译为 arm64；CI 只在 macOS 14/15/26 的 Apple Silicon runner 测试。
 `QINGTYPE_RUNTIME_APP` 为显式开发覆盖；公共分发检查拒绝含该覆盖的产物。
 
 每份应用 `Contents/Resources/BuildInfo.json` 记录源码提交、工作区是否干净、架构、
