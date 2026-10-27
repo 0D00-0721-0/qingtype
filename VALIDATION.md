@@ -32,6 +32,11 @@ Evidence: build/native-geometry-{build,tests,package,distribution,install}.log a
 build/native-geometry-row.png (ignored local files). Pushed-head CI must be read
 back separately; local success is not a remote CI result.
 
+The first geometry CI (40466635055) passed the engine checks but detected a
+fractional-metric overlap between the last expanded column and the chevron.
+Grid columns now use whole-point boundaries; the same 18 interaction checks and
+rebuilt distribution checks pass locally. A new remote run is still required.
+
 ## Installable preview and optional components — 0.4.0
 
 The normal QingType app now opens a native welcome page, installs/enables the

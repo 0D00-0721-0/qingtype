@@ -198,7 +198,9 @@ final class QingTypeExpandedCandidates: NSPanel {
     var width = min(maxWidth, widths.reduce(chromeWidth, +))
     if vertical { width = min(maxWidth, max(160, (widths.max() ?? 100) + chromeWidth)) }
     if expanded { width = min(maxWidth, max(360, width)) }
-    let gridCellWidth = (width - chromeWidth) / 6
+    // Whole-point column boundaries also stay disjoint from the chevron when
+    // a different system font returns fractional glyph widths.
+    let gridCellWidth = floor((width - chromeWidth) / 6)
     columns = expanded ? 6 : (vertical ? 1 : row.count)
     hasMoreCandidates = candidates.count > row.count
     let bodyRows = expanded ? Int(ceil(Double(max(0, candidates.count - columns)) / Double(columns))) : 0
