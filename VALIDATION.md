@@ -1,8 +1,48 @@
-# Local validation — 2026-10-27 — QingType 0.4.2
+# Local validation — 2026-10-27 — QingType 0.5.0
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
+
+## Rime learning, persistence and recovery — 0.5.0
+
+Learning uses the existing Rime user dictionaries: qingtype_main for base pinyin
+and Xiaohe, and rime_ice for Ice. Legacy profiles default to enabled; switching
+off excludes learned candidates and stops new learning while preserving history.
+The native management page provides backup, export, merge restore, safe reset
+and explicit privacy clear. Backups contain native Rime snapshots, names and
+SHA-256 digests in a versioned .qinglearning container, saved with mode 0600.
+
+Offline workers stop the service, acquire an exclusive data lock, and only open
+private cloned databases. Normal service instances hold a shared lock. Snapshot
+restore is validated/merged in a workspace before replacing databases. Partial
+move or installation failures restore originals; unverified recovery blocks the
+service and retains a path ledger. Reset preserves a safety backup and includes
+local-sync-only history; privacy clear includes local snapshots and learning
+backups. Configuration, fixed/imported dictionaries, phrases and models are not
+learning targets. External custom sync paths stop reset/clear rather than being
+modified. A rapid off/on regression exposed second-granularity Rime schema
+freshness; deployment now invalidates only the active generated schema.
+
+287 local checks passed: the prior 193, 32 learning validation/boundary/rollback/
+lock checks, and 62 actual-engine learning checks with Ice. The suite verifies
+repeated low-weight selection changes ranking, a completely new process retains
+it, CSV import/deletion and deployment preserve it, Xiaohe shares base learning,
+disabled learning adds no entries, learned copies survive fixed-row deletion,
+portable restore recovers ranking and retains newer history, sync-only history
+is recoverable, and both base/Ice survive reset/recovery. The same 62 checks also
+passed with the local reference Wanxiang model; plugin output confirms loading.
+All destructive/reset/recovery tests use temporary synthetic data, never the
+user's active databases. Two additional partial-replacement checks were run as
+the final 32-check safety suite after the full regression pass.
+
+The rebuilt DMG passed mounting, signing-structure and offline-engine checks.
+The native installer installed/enabled 0.5.0 and verified deployment/model load;
+normal app, nested payload and installed service match. JSON comparison confirms
+all preexisting settings unchanged, with only default learningEnabled added.
+Actual page inspection, production backup UI and pushed-head CI are pending at
+this checkpoint; real application learning remains separate manual acceptance.
+See docs/LEARNING.md and ignored build/phase2-*.log for reproducible evidence.
 
 ## Expanded long-candidate layout — 0.4.2
 
@@ -21,7 +61,8 @@ body wrapping, actual first-row numbering and visual-row navigation. The AppKit
 long-phrase preview is 794 x 282 px. Rebuilt DMG mounting and offline-engine
 checks pass. Native installation verifies 0.4.2, deployment/model load and all
 existing settings unchanged; both installed app payloads match the built binary.
-Actual long-input expansion and pushed-head CI are still pending. Evidence is
+The user confirmed complete long text, normal width and wrapping in the real
+faxinmoxinglema scenario. Commit 47ed1f6 passed CI 40470411896. Evidence is
 in ignored build/expanded-spans-*.log and expanded-spans-preview.png.
 
 ## Native candidate geometry — 0.4.1

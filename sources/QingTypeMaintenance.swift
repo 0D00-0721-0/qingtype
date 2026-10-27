@@ -5,6 +5,15 @@ enum QingTypeMaintenance {
   static func deploy(api: RimeApi_stdbool, directory: URL = QingTypePaths.userDirectory) throws -> QingTypeDeploymentReport {
     let settings = try QingTypeSettings.load(from: directory)
     try settings.validate()
+    // Rime's schema freshness check has second-level timestamp granularity.
+    // Immediate off/on saves must not reuse the previous compiled switch value.
+    // Invalidate only this generated schema; user databases are never removed.
+    let build = directory.appendingPathComponent("build")
+    guard (try? build.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
+      throw SettingsError.invalid("编译目录包含符号链接，已停止部署。")
+    }
+    let compiled = build.appendingPathComponent(settings.schema + ".schema.yaml")
+    if FileManager.default.fileExists(atPath: compiled.path) { try FileManager.default.removeItem(at: compiled) }
     let logs = directory.appendingPathComponent("deployment-logs/\(UUID())")
     try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
     var traits = RimeTraits.rimeStructInit()
@@ -40,7 +49,6 @@ enum QingTypeMaintenance {
       var sentenceContext = RimeContext_stdbool.rimeStructInit()
       if api.get_context(session, &sentenceContext) { _ = api.free_context(&sentenceContext) }
     }
-    let compiled = directory.appendingPathComponent("build/\(settings.schema).schema.yaml")
     let header = try Yams.load(yaml: String(contentsOf: compiled, encoding: .utf8)) as? [String: Any]
     let translator = header?["translator"] as? [String: Any]
     let prism = translator?["prism"] as? String ?? ""

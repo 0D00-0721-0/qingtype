@@ -28,3 +28,7 @@ __pycache__/
 .env.*
 *.gram
 *.userdb/
+*.userdb.txt
+*.qinglearning
+.qingtype-data.lock
+.learning-recovery-*/

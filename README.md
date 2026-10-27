@@ -1,7 +1,7 @@
 # 清言输入法 · QingType
 
 基于 Rime 与鼠须管的开源 macOS 输入法。目标是用 Mac 原生界面完成日常输入、
-自定义词库添加及万象等本地语言模型管理。当前为 **0.4.0 可安装预览版**，GPL-3.0。
+自定义词库添加及万象等本地语言模型管理。源码开发版 **0.5.0**，GitHub 下载包仍为 **0.4.0 可安装预览版**，GPL-3.0。
 
 ## 使用
 
@@ -28,6 +28,9 @@
 - **个人词库**：词语、拼音、词频的新增、编辑、删除、搜索、排序和重复校验；
   CSV／TSV／TXT 预检、错误行报告、冲突策略及导出。点击“保存并应用”后编译生效。
   [使用格式与验收](docs/PERSONAL_DICTIONARY.md)。
+- **自动学习**：使用 Rime 用户词典调整选词排序；支持开关、私有备份、导出、合并恢复、
+  重置及本机学习数据清除。个人词库与模型独立保留。
+  [学习数据、隐私与验收](docs/LEARNING.md)。
 - **导入词库**：导入 `.dict.yaml`，支持同一文件夹内通过 `import_tables` 引用的依赖。
   选中要启用的词库，再点“保存并应用”。
 - **语言模型**：从「开始使用」或「语言模型」页下载官方万象模型并启用，按当前方案选择简体或繁体。
@@ -71,7 +74,7 @@ open "build/distribution/清言.app"
 不会安装鼠须管，不读取其用户配置。`QINGTYPE_RUNTIME_APP` 仅用于显式开发覆盖。
 需要 macOS SDK 和 Swift 工具链，可使用 Xcode 或 Command Line Tools。
 构建目标为 macOS 14.0；输出 `build/QingType.app` 输入服务和原生设置，打包生成
-`build/distribution/清言.app` 与 `QingType-0.4.0-<架构>.dmg`，包内没有可选模型和个人数据。
+`build/distribution/清言.app` 与 `QingType-<版本>-<架构>.dmg`，包内没有可选模型和个人数据。
 
 ```sh
 ./scripts/install-dev.sh

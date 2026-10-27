@@ -20,6 +20,26 @@ struct SquirrelApp {
 
     let handled = autoreleasepool {
       let installer = SquirrelInstaller()
+      if let index = CommandLine.arguments.firstIndex(of: "--learning-restart-probe"), CommandLine.arguments.count > index + 2 {
+        if !QingTypeLearningDiagnostics.probe(api: rimeAPI, directory: URL(fileURLWithPath: CommandLine.arguments[index + 1]), schema: CommandLine.arguments[index + 2]) { exit(1) }
+        return true
+      }
+      if CommandLine.arguments.contains("--learning-engine-test") {
+        let package = ProcessInfo.processInfo.environment["QINGTYPE_RIME_ICE_TEST_PACKAGE"].map { URL(fileURLWithPath: $0) }
+        return QingTypeLearningDiagnostics.run(api: rimeAPI, package: package)
+      }
+      if let index = CommandLine.arguments.firstIndex(of: "--learning-data-worker"), CommandLine.arguments.count > index + 1 {
+        do {
+          let lock = try QingTypeDataLock(directory: userDir, exclusive: true)
+          defer { withExtendedLifetime(lock) {} }
+          guard NSRunningApplication.runningApplications(withBundleIdentifier: "org.qingtype.inputmethod.QingType")
+            .allSatisfy({ $0.processIdentifier == getpid() }) else { throw SettingsError.invalid("输入服务仍在运行，学习数据操作已停止。") }
+          let source = CommandLine.arguments.count > index + 2 ? URL(fileURLWithPath: CommandLine.arguments[index + 2]) : nil
+          let report = try QingTypeLearningMaintenance.run(api: rimeAPI, action: CommandLine.arguments[index + 1], directory: userDir, source: source)
+          print(String(decoding: try JSONEncoder().encode(report), as: UTF8.self))
+        } catch { fputs("\(error.localizedDescription)\n", stderr); exit(error is QingTypeLearningRecoveryError ? 2 : 1) }
+        return true
+      }
       if CommandLine.arguments.contains("--engine-smoke-test") {
         return QingTypeDiagnostics.runEngineTest(api: rimeAPI)
       }
@@ -45,6 +65,8 @@ struct SquirrelApp {
       }
       if CommandLine.arguments.contains("--deploy-user-data") {
         do {
+          let lock = try QingTypeDataLock(directory: userDir, exclusive: true)
+          defer { withExtendedLifetime(lock) {} }
           let running = NSRunningApplication.runningApplications(withBundleIdentifier: "org.qingtype.inputmethod.QingType")
             .filter { $0.processIdentifier != getpid() }
           guard running.isEmpty else {
@@ -167,6 +189,10 @@ struct SquirrelApp {
     }
 
     autoreleasepool {
+      let dataLock: QingTypeDataLock
+      do { dataLock = try QingTypeDataLock(directory: userDir, exclusive: false) }
+      catch { NSLog("QingType data is busy: %@", error.localizedDescription); return }
+      defer { withExtendedLifetime(dataLock) {} }
       // CLI diagnostics above are independent. A second service instance must
       // never compete with the installed input method for its IMK endpoint.
       if let existing = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier!)

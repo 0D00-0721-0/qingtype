@@ -20,6 +20,7 @@ struct QingTypeSettings: Codable, Equatable {
   var pageSize = 5
   var inlinePreedit = true
   var useShift = true
+  var learningEnabled = true
   var phrases: [QuickPhrase] = []
   var personalWords: [PersonalWord] = []
   var useSystemCandidates = true
@@ -33,7 +34,7 @@ struct QingTypeSettings: Codable, Equatable {
   init() {}
 
   enum CodingKeys: String, CodingKey {
-    case schema, layout, fontSize, pageSize, inlinePreedit, useShift, phrases, personalWords
+    case schema, layout, fontSize, pageSize, inlinePreedit, useShift, learningEnabled, phrases, personalWords
     case useSystemCandidates, dictionaries, models, activeModelID, rimeIce
   }
 
@@ -46,6 +47,7 @@ struct QingTypeSettings: Codable, Equatable {
     pageSize = try values.decodeIfPresent(Int.self, forKey: .pageSize) ?? pageSize
     inlinePreedit = try values.decodeIfPresent(Bool.self, forKey: .inlinePreedit) ?? inlinePreedit
     useShift = try values.decodeIfPresent(Bool.self, forKey: .useShift) ?? useShift
+    learningEnabled = try values.decodeIfPresent(Bool.self, forKey: .learningEnabled) ?? true
     phrases = try values.decodeIfPresent([QuickPhrase].self, forKey: .phrases) ?? []
     personalWords = try (values.decodeIfPresent([PersonalWord].self, forKey: .personalWords) ?? []).map { try $0.normalized() }
     useSystemCandidates = try values.decodeIfPresent(Bool.self, forKey: .useSystemCandidates) ?? true
@@ -170,6 +172,8 @@ struct QingTypeSettings: Codable, Equatable {
     for schemaID in ["luna_pinyin_simp", "luna_pinyin", "qingtype_double_pinyin"] + (rimeIce == nil ? [] : ["rime_ice"]) {
       let prism = "qingtype_" + schemaID
       var patch: [String: Any] = ["translator/dictionary": schemaID == "rime_ice" ? QingTypeRimeIce.dictionaryName : "qingtype_main", "translator/prism": prism,
+                                   "translator/user_dict": schemaID == "rime_ice" ? "rime_ice" : "qingtype_main",
+                                   "translator/enable_user_dict": learningEnabled,
                                    "grammar/language": activeModel?.language ?? ""]
       if schemaID == "rime_ice" {
         patch["translator/user_dict"] = "rime_ice"

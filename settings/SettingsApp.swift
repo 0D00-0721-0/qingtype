@@ -30,6 +30,7 @@ final class SettingsModel: ObservableObject {
   @Published var inputEnabled = false
   @Published var transferProgress: QingTypeTransferProgress?
   @Published var canCancelDownload = false
+  @Published var learningSummary = "正在读取本机学习数据…"
   var componentTask: Task<Void, Never>?
 
 
@@ -142,7 +143,7 @@ final class SettingsModel: ObservableObject {
 }
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-  case welcome = "开始使用", input = "输入", appearance = "外观", personal = "个人词库", dictionaries = "导入词库", models = "语言模型", phrases = "快捷短语", about = "关于与安装"
+  case welcome = "开始使用", input = "输入", appearance = "外观", personal = "个人词库", learning = "自动学习", dictionaries = "导入词库", models = "语言模型", phrases = "快捷短语", about = "关于与安装"
   var id: String { rawValue }
   var icon: String {
     switch self {
@@ -150,6 +151,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case .input: return "keyboard"
     case .appearance: return "textformat.size"
     case .personal: return "text.book.closed"
+    case .learning: return "clock.arrow.circlepath"
     case .dictionaries: return "books.vertical"
     case .models: return "brain"
     case .phrases: return "text.bubble"
@@ -193,6 +195,7 @@ struct SettingsView: View {
               case .input: inputPage
               case .appearance: appearancePage
               case .personal: PersonalDictionaryPage(model: model)
+              case .learning: LearningPage(model: model)
               case .dictionaries: dictionariesPage
               case .models: modelsPage
               case .phrases: phrasesPage
@@ -239,6 +242,7 @@ struct SettingsView: View {
     case .input: return "选好输入习惯，安心写下每一句。"
     case .appearance: return "候选窗随系统明暗模式与高亮颜色变化。"
     case .personal: return "管理词语、拼音和词频，保存后参与日常输入。"
+    case .learning: return "保留选词习惯，管理学习记录与备份。"
     case .dictionaries: return "添加专业词与个人词库，让输入更懂你的用词。"
     case .models: return "使用万象等本地语言模型，参与整句候选排序。"
     case .phrases: return "用一小段字母，输入经常说的话。"

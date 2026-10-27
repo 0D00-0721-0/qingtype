@@ -13,6 +13,8 @@ swiftc -parse-as-library -swift-version 5 shared/*.swift tests/RimeIceTests.swif
 build/rime-ice-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/SetupTests.swift "${yaml_flags[@]}" -o build/setup-tests
 build/setup-tests
+swiftc -parse-as-library -swift-version 5 shared/*.swift tests/LearningTests.swift "${yaml_flags[@]}" -o build/learning-tests
+build/learning-tests
 build/content-tests
 build/QingType.app/Contents/MacOS/QingType --engine-smoke-test
 build/QingType.app/Contents/MacOS/QingType --factory-engine-test
@@ -21,6 +23,7 @@ if [[ -n "${QINGTYPE_RIME_ICE_TEST_PACKAGE:-}" ]]; then
   build/QingType.app/Contents/MacOS/QingType --rime-ice-engine-test "$QINGTYPE_RIME_ICE_TEST_PACKAGE"
 fi
 build/QingType.app/Contents/MacOS/QingType --candidate-ui-test
+build/QingType.app/Contents/MacOS/QingType --learning-engine-test
 python3 tests/InputSourceCacheTests.py
 build/QingType.app/Contents/MacOS/QingType --status > build/input-source-status.json
 python3 - <<'PY'
