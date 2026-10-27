@@ -77,7 +77,8 @@ jobs:
       - name: Publish verified preview
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           git archive --format=tar.gz --prefix=QingType/ HEAD > release-assets/QingType-source.tar.gz
-          gh release create "$RELEASE_TAG" release-assets/* --verify-tag --prerelease --title "清言 $RELEASE_TAG" --notes-file docs/RELEASE_NOTES.md
+          gh release create "$RELEASE_TAG" release-assets/* --repo "$GH_REPO" --verify-tag --prerelease --title "清言 $RELEASE_TAG" --notes-file docs/RELEASE_NOTES.md
