@@ -1,4 +1,4 @@
-# Local validation — 2026-10-27 — QingType 0.6.1
+# Local validation — 2026-10-27 — QingType 0.6.2
 
 Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
@@ -29,6 +29,16 @@ then detected the actual older model and entered downloading; clicking Cancel
 restored the controls immediately. Settings/deployment hashes and mtimes plus
 input-service PIDs were unchanged. The existing model was not replaced. Full
 real download/activation and a GUI app self-update remain separate acceptance.
+
+The feature commit 0c3f156 passed CI 40522851955 on macOS 14/15/26 ARM.
+v0.6.2-preview.1 publishes a clean local build of this same source commit:
+DMG SHA-256 6d13b4d5c79e9c8fc5a0fbdc97c4e643cf91fa6cc32b633fa6a0a7d8a34d1e0b.
+DMG/source/data boundaries, signing structure and portable/server digests were
+checked before publishing the draft. Local download of the CI artifact stalled
+and was terminated, so this package is explicitly the clean local build, not a
+CI binary. Both installed programs are the previously verified 0.6.2 development
+build; the final replacement with the published build was stopped when the Mac
+locked. A manual unlock is required before that optional UI-driven replacement.
 
 ## Long collapsed candidates — 0.6.1
 

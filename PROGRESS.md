@@ -2,18 +2,19 @@
 
 更新时间：2026-10-27（Asia/Shanghai）。目标/边界见 AGENTS.md，验收标准见 ROADMAP.md。
 
-## 正在收尾：0.6.2 模型检查与转圈修复
+## 0.6.2 模型检查与转圈修复
 
 - 已有模型按钮改为「检查模型更新」；先比较官方 LTS 哈希并校验本地文件，同一模型直接提示并跳过下载/部署/输入服务重启；首次安装或内容不同才下载。已安装但未启用的最新模型保持当前选择。
 - 用户报告一直转圈，实际界面忙碌、无取消入口。旧提示在检查完成、下载连接尚无首批数据时仍可能写「正在检查」。已为元数据使用独立会话，10 秒空闲/15 秒整体请求上限，明确 GitHub 限流/超时；检查与下载连接阶段均显示取消按钮，阶段文字即时切换。本地哈希检查也可取消；配置恢复所用默认哈希保持原行为。
 - 本地新增模型 20 项、元数据/取消 12 项检查通过；完整回归及 DMG 通过。真实官方元数据+418MB 缓存模型已在隔离目录验证同哈希无下载；本机旧模型正确判定有更新。
 - 正常应用和输入服务均已装到 0.6.2，全部设置值保留。原生实际检查进入下载阶段后，点击「取消下载」立即恢复按钮、停止转圈；设置/部署文件哈希与时间及服务 PID 均未改变，模型没有被替换。旧卡住的设置进程已结束。
-- 当前源码准备提交，公开下载仍为 0.6.1。真实完整模型下载/启用与两个公开版本间 GUI 自更新尚未验收，不得标记完成；此前 GitHub 匿名 API 出现限流，这次原生请求已成功取到更新信息。
+- 已提交 0c3f156，macOS 14/15/26 Apple Silicon 的 CI 40522851955 全通过，v0.6.2-preview.1 已发布。公开包由同一干净源码本机构建，BuildInfo 为 0c3f156/clean，服务器摘要与本地一致。最终要把已验证的本机开发构建换为同一发布构建时 Mac 已锁屏，原生工具要求手动解锁；此替换尚未做，现有 0.6.2 修复版已安装可用。真实完整模型下载/启用与 GUI 自更新尚未验收；此次实际下载连接已主动取消，未换模型。
 
 ## 当前版本与支持范围
 
-本机开发版 **0.6.2**，公开预览仍为 **0.6.1**；仅支持 M 芯片 Mac，macOS 14+。用户明确不再开发/验收 Intel，此约束已写入 AGENTS.md、构建入口和 CI。
-已发布 [v0.6.1-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.1-preview.1)，非草稿、预览版。tag 指向 fffae68ec5b6c99d864ef4033865f8603d2b39c2；main 后继 e638a42 只改测试镜像清理和进度记录，未移动 tag。
+本机已安装 **0.6.2 开发修复版**，公开预览为 **0.6.2**；仅支持 M 芯片 Mac，macOS 14+。
+新发布 [v0.6.2-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.2-preview.1)，tag 为 0c3f156f2c44ce1b53374b72ff1f1149e51f3404。用户明确不再开发/验收 Intel，此约束已写入 AGENTS.md、构建入口和 CI。
+历史基线 [v0.6.1-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.1-preview.1)，非草稿、预览版。tag 指向 fffae68ec5b6c99d864ef4033865f8603d2b39c2；main 后继 e638a42 只改测试镜像清理和进度记录，未移动 tag。
 
 ## 已完成
 
@@ -37,6 +38,9 @@
 
 ## 远端与发行证据
 
+- 0.6.2 的 [CI 40522851955](https://github.com/0D00-0721-0/qingtype/actions/runs/40522851955) 三系统全通过，新增模型 20 / 元数据取消 12 项均通过。DMG、便携 SHA 和源码已上传完成后校验服务器摘要，再从草稿发布，只有 arm64，仍为临时签名未公证预览。
+- 0.6.2 DMG SHA-256 **6d13b4d5c79e9c8fc5a0fbdc97c4e643cf91fa6cc32b633fa6a0a7d8a34d1e0b**。来源是同一已过 CI 的干净 0c3f156 本机构建（CI 资产本地下载连接阻塞后已结束，不冒充安装了 CI 二进制）；包与源码的个人数据排除检查通过。
+
 - 候选修复 bfc4379 的 [CI 40507767209](https://github.com/0D00-0721-0/qingtype/actions/runs/40507767209)：macOS 14/15/26 Apple Silicon 全通过。
 - 最终 tag 的 [发布流程 40509068950](https://github.com/0D00-0721-0/qingtype/actions/runs/40509068950)：三系统完整构建/测试/包检查和 publish 全通过。首次 macOS 14 在所有功能通过后卸载测试镜像返回设备忙，失败任务重跑后通过；main 已补有限重试，仅处理该临时状态、不强制卸载镜像。
 - 清理改进 e638a42 的 [CI 40510271366](https://github.com/0D00-0721-0/qingtype/actions/runs/40510271366)：macOS 14/15/26 Apple Silicon 全通过。
@@ -45,10 +49,13 @@
 
 ## 下一步与尚未完成的验收
 
+0. 手动解锁 Mac 后，如无未保存设置/进行中的操作，可把正常应用和输入服务对齐到 build/distribution 中的 0.6.2 发布构建；不要因版本号相同而声称当前开发包与发布包字节相同。
 1. 个人词库编辑/删除/批量导入、重启后的真人结果仍需逐项记录；不能把新建+重新应用保留当作全部 Phase 1 人工验收。
 2. 自更新的程序事务已隔离验证，正常安装器和生产程序替换真实运行过；两个公开维护版之间的完整 GUI 自更新仍待下一次版本升级。干净/可恢复 Mac 仍需安装→输入→升级→卸载→数据保留图形验收，本机未为测试实际卸载。
 3. 继续 docs/COMPATIBILITY.md 中其他应用、数字/翻页/编辑组合、真实多屏/缩放/全屏/休眠和长时间使用，按控件记录，不用内部检查替代真实输入。
 4. 有效签名身份仍为 0：临时签名、未公证预览可从 GitHub 下载；Developer ID、公证与默认系统信任需真实证书。完整运行库源码重建/分发溯源审计仍有记录限制。
 5. Phase 6 待核心稳定后按真实需求增强；不扩大到 AI、账号或主题商城。原始 ~/Library/Rime 始终不作可写目标。
 
-本轮证据位于被忽略的 build/maintenance-*.log、compact-*.log、tagged-preview-install.log、published-preview.json、published-update-download.log 和 releases/v0.6.1-preview.1/。用户词条、模型、学习记录、日志和签名私钥不提交 Git。
+新增证据：build/model-spinner-*.log、model-metadata-tests.log、model-hash-real-test.log、published-model-update.json；原生取消前后设置/部署哈希和时间、服务 PID 快照为 model-check-ui-before.json。
+
+此前证据位于被忽略的 build/maintenance-*.log、compact-*.log、tagged-preview-install.log、published-preview.json、published-update-download.log 和 releases/v0.6.1-preview.1/。用户词条、模型、学习记录、日志和签名私钥不提交 Git。
