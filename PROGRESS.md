@@ -2,6 +2,13 @@
 
 更新时间：2026-10-28（Asia/Shanghai）。目标/边界见 AGENTS.md，验收标准见 ROADMAP.md。
 
+## 0.6.4 预览发布（2026-10-28）
+
+- 三个提交（`abab3c5` 升级顺序修复、`413c0ba` 安装状态与幂等、`88db9e0` 备份保留/签名/编译产物重建）已推送到 `origin/main`；[CI 40675623220](https://github.com/0D00-0721-0/qingtype/actions/runs/40675623220) macOS 14/15/26 Apple Silicon 全通过。
+- 轻量 tag `v0.6.4-preview.1` 指向 `88db9e0`；[发布工作流 40676557697](https://github.com/0D00-0721-0/qingtype/actions/runs/40676557697) 三系统构建/测试/打包与 publish 全通过。公开 [v0.6.4-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.4-preview.1) 为非草稿预览版，只有 arm64。
+- 实际下载核对：DMG 17,111,132 字节、SHA-256 **000349a8944f14d10084737bac894dc7909ce84a33d904833cddf99776b8adc6**，与 `.sha256` 和服务端 digest 一致；挂载后两个 bundle 均为 0.6.4，BuildInfo 为干净的 88db9e0/arm64/macOS 14.0，临时签名校验通过，18 项离线引擎检查与 `DistributionTests.py` 通过。源码 tar.gz VERSION 为 0.6.4，未含学习库、设置、模型或个人路径。
+- 本机 `~/Applications/清言.app` 已更新为同一构建；输入法仍为 0.6.4。尚未做的：完整 GUI 自更新（检查→下载→校验→替换）与真实键盘输入复核。
+
 ## 安装与更新状态审计（2026-10-28）
 
 - 修复前行为：已安装后点「重新检查并启用」总是走完整事务——复制 bundle、备份、原子替换、重复注册/启用输入源、重新部署。最终状态一致，但操作不幂等，且没有状态模型：UI 只有 `installedVersion` 和 `inputEnabled` 两个 Bool。
@@ -142,8 +149,9 @@
 
 ## 当前版本与支持范围
 
-本机已安装 **0.6.4 本地构建**（修复 0.6.3 升级失败，尚未发布）；最新公开预览为 **0.6.3**；仅支持 M 芯片 Mac，macOS 14+。
-公开 [v0.6.3-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.3-preview.1)，tag 指向 8eac967d8e571dd81a9e15dc562df014cf55b0d5，DMG SHA-256 20eba9ef059da565869c4c2d7c6fefccc7bf4e96a1cc6c7a12039418816d1ec7；该包升级输入法时的失败原因与修复见上一节。
+本机已安装 **0.6.4 本地构建**；最新公开预览为 **0.6.4**；仅支持 M 芯片 Mac，macOS 14+。
+新发布 [v0.6.4-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.4-preview.1)，tag 指向 88db9e09a5b364bf2389ad709a8a9534177d0a84；公开 DMG 17,111,132 字节、SHA-256 000349a8944f14d10084737bac894dc7909ce84a33d904833cddf99776b8adc6，源码 tar.gz 627,800 字节、SHA-256 a2865393eec2931e9ffbbe681436d644f25b3ab9d9a958f4b7f2363a84d2cc24。
+上一版 [v0.6.3-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.3-preview.1)，tag 指向 8eac967d8e571dd81a9e15dc562df014cf55b0d5，DMG SHA-256 20eba9ef059da565869c4c2d7c6fefccc7bf4e96a1cc6c7a12039418816d1ec7；该包升级输入法时的失败原因与修复见前文。
 上一版 [v0.6.2-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.2-preview.1)，tag 为 0c3f156f2c44ce1b53374b72ff1f1149e51f3404。用户明确不再开发/验收 Intel，此约束已写入 AGENTS.md、构建入口和 CI。
 历史基线 [v0.6.1-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.1-preview.1)，非草稿、预览版。tag 指向 fffae68ec5b6c99d864ef4033865f8603d2b39c2；main 后继 e638a42 只改测试镜像清理和进度记录，未移动 tag。
 
@@ -182,7 +190,7 @@
 
 0. 先解决实际卸载时 macOS TIS 停用状态不一致，以及停用父输入源后无法通过 API 可靠恢复的问题；不得在未确认恢复的情况下再次强制停用。本机输入服务与设置应用仍是 0.6.2 开发构建；最新卸载保护已随源码发布，但自动卸载仍不可用。
 1. 个人词库编辑/删除/批量导入、重启后的真人结果仍需逐项记录；不能把新建+重新应用保留当作全部 Phase 1 人工验收。
-2. GUI 自更新的安装、部署阶段已在 0.6.3 → 0.6.4 真实升级中执行（手工构造待完成清单、服务保持运行，未走应用内下载），并通过；0.6.4 发布后仍需完整走一次「检查→下载→校验→替换→完成更新」的真实 GUI 流程。干净/可恢复 Mac 仍需安装→输入→升级→卸载→数据保留图形验收，本机未为测试实际卸载。
+2. GUI 自更新的安装、部署阶段已在 0.6.3 → 0.6.4 真实升级中执行（手工构造待完成清单、服务保持运行，未走应用内下载），并通过；0.6.4 已发布，仍需完整走一次「检查→下载→校验→替换→完成更新」的真实 GUI 流程。干净/可恢复 Mac 仍需安装→输入→升级→卸载→数据保留图形验收，本机未为测试实际卸载。
 3. 继续 docs/COMPATIBILITY.md 中其他应用、数字/翻页/编辑组合、真实多屏/缩放/全屏/休眠和长时间使用，按控件记录，不用内部检查替代真实输入。
 4. 有效签名身份仍为 0：临时签名、未公证预览可从 GitHub 下载；Developer ID、公证与默认系统信任需真实证书。完整运行库源码重建/分发溯源审计仍有记录限制。
 5. Phase 1–6 已有实现及自动化覆盖；仍须完成真实故障回滚、卸载、输入与模型降级验收。Phase 7 矩阵基础设施已建立，真实应用和环境验收待继续；Phase 8 App Store 最小实验尚未完成；不扩大到 AI、账号或主题商城。原始 ~/Library/Rime 始终不作可写目标。

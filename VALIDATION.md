@@ -4,6 +4,28 @@ Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+## 0.6.4 preview publication — 2026-10-28
+
+Source commits abab3c5 (deploy before enabling), 413c0ba (installation state and
+idempotency) and 88db9e0 (backup retention, signature checks, build recovery) were pushed
+to `main`; CI
+[40675623220](https://github.com/0D00-0721-0/qingtype/actions/runs/40675623220) passed on
+macOS 14/15/26 Apple Silicon. Tag `v0.6.4-preview.1` and release workflow
+[40676557697](https://github.com/0D00-0721-0/qingtype/actions/runs/40676557697) produced
+the public prerelease
+[v0.6.4-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.4-preview.1).
+
+The downloaded DMG (17,111,132 bytes, SHA-256
+`000349a8944f14d10084737bac894dc7909ce84a33d904833cddf99776b8adc6`) matched its `.sha256`
+file and the GitHub asset digest. Both bundles report 0.6.4, BuildInfo is clean
+88db9e0/arm64/macOS 14.0, the ad-hoc signature verifies, and the mounted package passed 18
+offline engine checks plus `DistributionTests.py`. The source archive
+(`a2865393eec2931e9ffbbe681436d644f25b3ab9d9a958f4b7f2363a84d2cc24`) reports VERSION 0.6.4
+and contains no learning databases, settings, models or absolute user paths. The installed
+`~/Applications/清言.app` was updated to the same build. A full GUI self-update
+(check → download → verify → replace) and a real keyboard input check after this build have
+not been performed yet.
+
 ## Installation state and idempotency audit — 2026-10-28
 
 Before the audit, pressing "重新检查并启用" after a successful install always ran the
