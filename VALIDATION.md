@@ -4,6 +4,20 @@ Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+## Model verification memory fix — 2026-10-28
+
+The 0.6.4 input service used 431 MB physical footprint and 522 MB RSS while Squirrel
+with the same 398 MB model used 27.7 MB footprint. `vmmap` showed about 398 one-megabyte
+malloc blocks. The startup model check hashed the `.gram` with 1 MB `FileHandle` reads,
+and the bridged `Data` chunks stayed in the autorelease pool, so the whole model was
+retained in the heap after verification. A standalone reproduction confirmed 406 MB RSS
+after the same loop and 8 MB when each read was wrapped in `autoreleasepool`.
+
+The loop now releases every chunk. The deployment worker peaks at 43 MB, the restarted
+service reports 19.6 MB physical footprint and about 60 MB RSS with the same model still
+loaded and deployed. The leak was introduced by the 0.6.3 startup verification (0.6.2 has
+no such path) and is present in the published 0.6.4; the next release should carry the fix.
+
 ## 0.6.4 preview publication — 2026-10-28
 
 Source commits abab3c5 (deploy before enabling), 413c0ba (installation state and

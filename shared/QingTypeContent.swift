@@ -56,9 +56,16 @@ enum QingTypeContent {
     let file = try FileHandle(forReadingFrom: url)
     defer { try? file.close() }
     var hash = SHA256()
-    while let data = try file.read(upToCount: 1_048_576), !data.isEmpty {
-      if checkingCancellation { try Task.checkCancellation() }
-      hash.update(data: data)
+    // Each 1 MB chunk is bridged through Foundation; without a pool the whole
+    // file stays resident (a 418 MB model kept ~400 MB after verification).
+    while true {
+      let finished = try autoreleasepool { () throws -> Bool in
+        if checkingCancellation { try Task.checkCancellation() }
+        guard let data = try file.read(upToCount: 1_048_576), !data.isEmpty else { return true }
+        hash.update(data: data)
+        return false
+      }
+      if finished { break }
     }
     return hash.finalize().map { String(format: "%02x", $0) }.joined()
   }
