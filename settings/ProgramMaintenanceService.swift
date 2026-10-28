@@ -138,67 +138,41 @@ enum ProgramMaintenanceService {
       NSRunningApplication.runningApplications(withBundleIdentifier: $0)
     }.filter { $0.processIdentifier != getpid() && !$0.isTerminated }
     guard others.isEmpty else { throw SettingsError.invalid("请先退出其他清言设置窗口，卸载已停止。") }
-    let previous = try await QingTypeInstallationSession.state(app: control)
-    _ = try await InstallationService.command(["--prepare-uninstall"], app: control)
-    func restoreSource() async throws {
-      if fm.fileExists(atPath: InstallationService.installedURL.path) { _ = try await InstallationService.command(["--register-input-source"]) }
-      let enabled = previous.inputSources.filter { $0.enabled == true }.map(\.id).joined(separator: ",")
-      let selected = previous.inputSources.first { $0.selected == true }?.id ?? ""
-      _ = try await InstallationService.command(["--restore-uninstall-source", enabled, selected], app: control)
-      let state = try JSONDecoder().decode(QingTypeInputSourceState.self, from: await InstallationService.command(["--status"], app: control))
-      let expected = Set(previous.inputSources.filter { $0.enabled == true }.map(\.id))
-      let selectedID = previous.inputSources.first { $0.selected == true }?.id
-      guard Set(state.inputSources.filter { $0.enabled == true }.map(\.id)) == expected,
-            state.inputSources.first(where: { $0.selected == true })?.id == selectedID else {
-        throw SettingsError.invalid("程序已恢复，输入源需在系统键盘设置中重新添加。")
-      }
+
+    // Read-only preflight. macOS 27 does not let a process disable a parent
+    // input source reliably, so the user removes it in System Settings first.
+    // Nothing is changed when a QingType source is still enabled.
+    let data = try await InstallationService.command(["--status"], app: control)
+    let status = try JSONDecoder().decode(QingTypeInputSourceState.self, from: data)
+    if let reason = QingTypeUninstallPreflight.blockedReason(for: status) {
+      throw SettingsError.invalid(reason)
     }
-    do { _ = try await InstallationService.command(["--verify-uninstall"], app: control) }
-    catch {
-      let reason = error.localizedDescription
-      do { try await restoreSource() }
-      catch { throw SettingsError.invalid("卸载已停止，输入源恢复未确认：\(reason)；\(error.localizedDescription)") }
-      throw SettingsError.invalid("卸载已停止，输入源已恢复：\(reason)")
-    }
+
     let running = NSRunningApplication.runningApplications(withBundleIdentifier: QingTypeAppInstallation.bundleID).filter { $0.processIdentifier != getpid() }
     running.forEach { $0.terminate() }
     for _ in 0..<40 {
       if running.allSatisfy(\.isTerminated) { break }
-      do { try await Task.sleep(nanoseconds: 100_000_000) }
-      catch {
-        do { try await restoreSource() }
-        catch { throw SettingsError.invalid("卸载已停止，输入源恢复未确认：\(error.localizedDescription)") }
-        throw SettingsError.invalid("卸载已取消，原输入源已恢复。")
-      }
+      try await Task.sleep(nanoseconds: 100_000_000)
     }
     guard running.allSatisfy(\.isTerminated) else {
-      do { try await restoreSource() }
-      catch { throw SettingsError.invalid("输入服务尚未退出，输入源恢复未确认：\(error.localizedDescription)") }
-      throw SettingsError.invalid("输入服务尚未退出，已停止卸载并恢复输入源。")
+      throw SettingsError.invalid("输入服务尚未退出，卸载已停止；输入源与程序均未改动。")
     }
-    var profileLock: QingTypeDataLock?
-    do { profileLock = try QingTypeDataLock(directory: QingTypePaths.userDirectory, exclusive: true) }
-    catch {
-      let reason = error.localizedDescription
-      do { try await restoreSource() }
-      catch { throw SettingsError.invalid("卸载已停止，输入源恢复未确认：\(reason)；\(error.localizedDescription)") }
-      throw SettingsError.invalid("卸载已停止，输入源已恢复：\(reason)")
-    }
-    defer { withExtendedLifetime(profileLock) {} }
+
     let staging = QingTypePaths.userDirectory.deletingLastPathComponent().appendingPathComponent("清言卸载备份-\(UUID())")
     var stagedURL: URL?
     do {
-      _ = try await InstallationService.command(["--verify-uninstall"], app: control)
       _ = try QingTypeProgramMaintenance.stageUninstall(items: items, allowed: allowed, userData: QingTypePaths.userDirectory, staging: staging)
       stagedURL = staging
-      // As during installation, stale per-app keyboard tables can retain a
-      // removed source. Only the two existing allowlisted cache names move.
+      // Stale per-app keyboard tables can retain a removed source. Only the two
+      // existing allowlisted cache names move.
       let getconf = Process(); getconf.executableURL = URL(fileURLWithPath: "/usr/bin/getconf"); getconf.arguments = ["DARWIN_USER_CACHE_DIR"]
       let output = Pipe(); getconf.standardOutput = output
       if (try? getconf.run()) != nil {
         let path = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         getconf.waitUntilExit()
-        if getconf.terminationStatus == 0, !path.isEmpty { _ = try? QingTypeInputCache.backUp(root: URL(fileURLWithPath: path), to: staging.appendingPathComponent("input-source-cache")) }
+        if getconf.terminationStatus == 0, !path.isEmpty {
+          _ = try? QingTypeInputCache.backUp(root: URL(fileURLWithPath: path), to: staging.appendingPathComponent("input-source-cache"))
+        }
       }
       let result: ([URL: URL], Error?) = await withCheckedContinuation { continuation in
         NSWorkspace.shared.recycle([staging]) { locations, error in continuation.resume(returning: (locations, error)) }
@@ -212,20 +186,8 @@ enum ProgramMaintenanceService {
       return result.0[staging] ?? staging
     } catch {
       if let stagedURL {
-        do {
-          try QingTypeProgramMaintenance.undoStagedUninstall(stagedURL, allowed: allowed)
-          // Selecting the source may immediately relaunch its service. Release
-          // the offline lock first so that service can open the restored data.
-          profileLock = nil
-          try await restoreSource()
-        }
+        do { try QingTypeProgramMaintenance.undoStagedUninstall(stagedURL, allowed: allowed) }
         catch { throw SettingsError.invalid("卸载恢复未完成，请保留恢复文件夹 \(stagedURL.path)。\(error.localizedDescription)") }
-      } else {
-        profileLock = nil
-        if fm.fileExists(atPath: InstallationService.installedURL.path) {
-          do { try await restoreSource() }
-          catch { throw SettingsError.invalid("卸载已停止，输入源恢复未确认：\(error.localizedDescription)") }
-        }
       }
       throw error
     }

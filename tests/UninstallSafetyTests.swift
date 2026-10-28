@@ -166,6 +166,20 @@ struct UninstallSafetyTests {
     catch { invalidRejected = true }
     try expect(invalidRejected, "invalid source IDs must not fall through to disabling all modes")
     try QingTypeUninstallGuard.validateModeIDs([inactive.hans], valid: [inactive.hans, inactive.hant])
+    // Guided uninstall: an enabled source blocks the operation; a removed one allows it.
+    let stillEnabled = QingTypeInputSourceState(inputSources: [
+      .init(id: inactive.hans, registered: true, enabled: true, selected: true),
+      .init(id: inactive.hant, registered: true, enabled: false, selected: false),
+    ])
+    try expect(QingTypeUninstallPreflight.blockedReason(for: stillEnabled) != nil,
+               "an enabled QingType source must block uninstall")
+    let removed = QingTypeInputSourceState(inputSources: [
+      .init(id: inactive.hans, registered: false, enabled: false, selected: false),
+      .init(id: inactive.hant, registered: false, enabled: false, selected: false),
+    ])
+    try expect(QingTypeUninstallPreflight.blockedReason(for: removed) == nil,
+               "removed sources must allow uninstall")
+    print("PASS: guided uninstall blocks while an input source is still enabled and allows uninstall after removal")
     print("PASS: current and non-current source, missing fallback, explicit and silent disable failure, unknown current and failed recovery")
     print("PASS: uninstall verifies before and after stop, aborts and restores on failures, moves only on success")
   }

@@ -36,8 +36,17 @@ struct MaintenancePage: View {
             .font(.callout).foregroundStyle(.secondary)
           Text("移除的文件会放在同一个恢复文件夹中，可从废纸篓找回。请先完成当前输入。")
             .font(.caption).foregroundStyle(.secondary)
-          Button("卸载清言…", role: .destructive) { confirmUninstall = true }
-            .disabled(model.busy || model.isDirty)
+          if model.inputEnabled {
+            Label("请先在系统设置中移除清言输入源", systemImage: "exclamationmark.triangle.fill")
+              .foregroundStyle(.orange)
+            Text("macOS 27 不允许程序可靠地停用输入法父输入源。请在「系统设置 → 键盘 → 文字输入 → 输入源」移除清言；完成后回到这里卸载。")
+              .font(.caption).foregroundStyle(.secondary)
+            Button("打开键盘设置", action: model.openKeyboardSettings)
+              .disabled(model.busy)
+          } else {
+            Button("卸载清言…", role: .destructive) { confirmUninstall = true }
+              .disabled(model.busy || model.isDirty)
+          }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
       }
       GroupBox("单独删除用户数据") {
@@ -58,6 +67,7 @@ struct MaintenancePage: View {
       }
     }
     .disabled(model.busy)
+    .onAppear { model.refreshInstallation() }
     .alert("安装更新并重启清言？", isPresented: $confirmUpdate) {
       Button("取消", role: .cancel) {}
       Button("安装并重启") { model.installAppUpdate() }
