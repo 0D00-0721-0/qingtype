@@ -34,8 +34,32 @@ enum QingTypeSetupDiagnostics {
       let saved = try QingTypeSettings.load(from: root)
       try expect(saved.rimeIce == nil && saved.models.isEmpty && saved.dictionaries.isEmpty && saved.useSystemCandidates,
                  "first use leaves optional components absent and native candidates enabled")
+      stop()
+      // Exercise the actual deployment entry point with a synthetic model in the isolated profile.
+      let fixture = root.appendingPathComponent("fixture.gram")
+      var fixtureBytes = Data(repeating: 0x61, count: 2048)
+      fixtureBytes.replaceSubrange(0..<17, with: Data("Rime::Grammar/1.0".utf8))
+      fixtureBytes.replaceSubrange(36..<44, with: [1, 0, 0, 0, 4, 0, 0, 0])
+      try fixtureBytes.write(to: fixture)
+      let fixtureModel = try QingTypeContent.importGrammar(from: fixture, into: root)
+      var withModel = settings
+      withModel.models = [fixtureModel]; withModel.activeModelID = fixtureModel.id
+      try withModel.save(to: root)
+      let config = root.appendingPathComponent("settings.json")
+      let compiledSchema = root.appendingPathComponent("build/\(settings.schema).schema.yaml")
+      let savedConfig = try Data(contentsOf: config)
+      let compiledBefore = try Data(contentsOf: compiledSchema)
+      try Data("corrupted model".utf8).write(to: root.appendingPathComponent(fixtureModel.language + ".gram"))
+      var modelRejected = false
+      do { _ = try QingTypeMaintenance.deploy(api: api, directory: root) }
+      catch { modelRejected = error.localizedDescription.contains("模型校验失败") }
+      try expect(modelRejected, "deployment rejects a model corrupted after configuration was saved")
+      let configAfter = try Data(contentsOf: config)
+      let compiledAfter = try Data(contentsOf: compiledSchema)
+      try expect(configAfter == savedConfig && compiledAfter == compiledBefore,
+                 "model verification fails before altering settings or compiled schema")
+      try settings.save(to: root)
       if let path = ProcessInfo.processInfo.environment["QINGTYPE_FACTORY_TEST_MODEL"] {
-        stop()
         var enhanced = settings
         let model = try QingTypeContent.importGrammar(from: URL(fileURLWithPath: path), into: root)
         enhanced.models = [model]; enhanced.activeModelID = model.id

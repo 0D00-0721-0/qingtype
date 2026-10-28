@@ -31,6 +31,7 @@ jobs:
         run: ./scripts/build-dev.sh
       - name: Run isolated engine, UI contract and data-safety checks
         env:
+          QINGTYPE_REQUIRE_RIME_ICE_TEST: "1"
           QINGTYPE_RIME_ICE_TEST_PACKAGE: ${{ github.workspace }}/build/rime-ice-fixture
         run: ./scripts/test.sh
       - name: Build and inspect the installable preview

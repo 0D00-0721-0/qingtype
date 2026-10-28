@@ -40,6 +40,7 @@ jobs:
       - run: ./scripts/build-dev.sh
       - run: ./scripts/test.sh
         env:
+          QINGTYPE_REQUIRE_RIME_ICE_TEST: "1"
           QINGTYPE_RIME_ICE_TEST_PACKAGE: ${{ github.workspace }}/build/rime-ice-fixture
       - name: Package and verify
         env:

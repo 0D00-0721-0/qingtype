@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+if [[ "${QINGTYPE_REQUIRE_RIME_ICE_TEST:-0}" == "1" ]] &&
+   [[ -z "${QINGTYPE_RIME_ICE_TEST_PACKAGE:-}" || ! -f "${QINGTYPE_RIME_ICE_TEST_PACKAGE:-}/rime_ice.schema.yaml" ]]; then
+  echo "FAIL: required Rime Ice test fixture is missing or invalid" >&2
+  exit 1
+fi
+python3 tests/TestRunnerTests.py
 python3 tests/VersionTests.py
 python3 scripts/version.py check-bundles build/QingType.app 'build/QingType.app/Contents/Applications/QingType Settings.app'
 mkdir -p build
@@ -35,6 +41,8 @@ build/QingType.app/Contents/MacOS/QingType --factory-engine-test
 build/QingType.app/Contents/MacOS/QingType --personal-dictionary-engine-test
 if [[ -n "${QINGTYPE_RIME_ICE_TEST_PACKAGE:-}" ]]; then
   build/QingType.app/Contents/MacOS/QingType --rime-ice-engine-test "$QINGTYPE_RIME_ICE_TEST_PACKAGE"
+else
+  echo "SKIP: Rime Ice engine integration (fixture not supplied)"
 fi
 build/QingType.app/Contents/MacOS/QingType --candidate-ui-test
 build/QingType.app/Contents/MacOS/QingType --learning-engine-test

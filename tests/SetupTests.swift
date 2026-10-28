@@ -14,6 +14,13 @@ struct SetupTests {
     func rejects(_ operation: () throws -> Void) throws {
       do { try operation() } catch { checks += 1; return }; throw SettingsError.invalid("Invalid setup input was accepted")
     }
+    func rejectsAsync(_ operation: () async throws -> Void) async throws -> Error {
+      do { try await operation() } catch { checks += 1; return error }
+      throw SettingsError.invalid("Expected setup operation to fail")
+    }
+    var rejectedUnexpectedSuccess = false
+    do { _ = try await rejectsAsync {} } catch { rejectedUnexpectedSuccess = true }
+    try expect(rejectedUnexpectedSuccess, "failure assertion rejects a successful operation")
     let factory = QingTypeSettings()
     try expect(factory.schema == "luna_pinyin_simp" && factory.rimeIce == nil && factory.activeModelID == nil && factory.models.isEmpty, "factory input needs no optional component")
     let files = try factory.generatedFiles()
@@ -60,58 +67,64 @@ struct SetupTests {
     try expect(blockedConcurrentInstall, "concurrent install is rejected before another replacement")
     let newer = try fakeApp("newer.app", version: "3")
     var restored = false
-    do {
+    _ = try await rejectsAsync {
       try await QingTypeAppInstallation.install(source: newer, destination: destination, backups: root.appendingPathComponent("backups/failure"), rollback: { existed in
         restored = existed ? (try QingTypeAppInstallation.version(at: destination)) == "2" : false
       }) {
         throw SettingsError.invalid("simulated activation failure")
       }
-      throw SettingsError.invalid("expected activation failure")
-    } catch {
-      try expect(try QingTypeAppInstallation.version(at: destination) == "2", "failed activation restores previous app")
     }
+    try expect(try QingTypeAppInstallation.version(at: destination) == "2", "failed activation restores previous app")
     try expect(restored, "external state is rolled back after restoring the previous bundle")
-    do {
+    var activatedDuringCopyFailure = false
+    var copyAttempted = false
+    _ = try await rejectsAsync {
       try await QingTypeAppInstallation.install(source: newer, destination: destination, backups: backups, copy: { _, stage in
+        copyAttempted = true
         try manager.createDirectory(at: stage, withIntermediateDirectories: true)
         try Data("partial".utf8).write(to: stage.appendingPathComponent("partial"))
         throw SettingsError.invalid("simulated copy failure")
-      }) { throw SettingsError.invalid("activation should not run") }
-      throw SettingsError.invalid("expected copy failure")
-    } catch { try expect(try QingTypeAppInstallation.version(at: destination) == "2", "copy failure leaves previous bundle intact") }
-    do {
+      }) { activatedDuringCopyFailure = true }
+    }
+    try expect(copyAttempted && !activatedDuringCopyFailure && (try QingTypeAppInstallation.version(at: destination)) == "2", "copy failure leaves previous bundle intact and never activates")
+    var activatedDuringInvalidStage = false
+    var validationAttempted = false
+    _ = try await rejectsAsync {
       try await QingTypeAppInstallation.install(source: newer, destination: destination, backups: backups, validate: { _ in
+        validationAttempted = true
         throw SettingsError.invalid("simulated signature failure")
-      }) { throw SettingsError.invalid("activation should not run") }
-      throw SettingsError.invalid("expected staged validation failure")
-    } catch { try expect(try QingTypeAppInstallation.version(at: destination) == "2", "staged validation failure leaves previous bundle intact") }
-    do {
+      }) { activatedDuringInvalidStage = true }
+    }
+    try expect(validationAttempted && !activatedDuringInvalidStage && (try QingTypeAppInstallation.version(at: destination)) == "2", "staged validation failure leaves previous bundle intact and never activates")
+    let recoveryError = try await rejectsAsync {
       try await QingTypeAppInstallation.install(source: newer, destination: destination, backups: root.appendingPathComponent("backups/recovery-failure"), rollback: { _ in
         throw SettingsError.invalid("injected source restore failure")
       }) { throw SettingsError.invalid("injected activation failure") }
-      throw SettingsError.invalid("expected recovery failure")
-    } catch {
-      try expect(error.localizedDescription.contains("恢复未确认") && (try QingTypeAppInstallation.version(at: destination)) == "2", "incomplete external recovery is reported even when the bundle was restored")
     }
+    try expect(recoveryError.localizedDescription.contains("恢复未确认") && (try QingTypeAppInstallation.version(at: destination)) == "2", "incomplete external recovery is reported even when the bundle was restored")
     let fresh = root.appendingPathComponent("fresh.app")
-    do {
-      try await QingTypeAppInstallation.install(source: source, destination: fresh, backups: backups) { throw SettingsError.invalid("simulated first-install failure") }
-      throw SettingsError.invalid("expected initial failure")
-    } catch { try expect(!manager.fileExists(atPath: fresh.path), "failed first installation removes the unactivated app") }
+    var freshActivationAttempted = false
+    _ = try await rejectsAsync {
+      try await QingTypeAppInstallation.install(source: source, destination: fresh, backups: backups) {
+        freshActivationAttempted = true
+        throw SettingsError.invalid("simulated first-install failure")
+      }
+    }
+    try expect(freshActivationAttempted && !manager.fileExists(atPath: fresh.path), "failed first installation removes the unactivated app")
     try await QingTypeAppInstallation.install(source: source, destination: fresh, backups: backups) {}
     try expect(try QingTypeAppInstallation.version(at: fresh) == "2", "fresh installation succeeds")
     try expect(try String(contentsOf: userData, encoding: .utf8) == "private learning unchanged", "app transactions never alter user learning")
     let older = try fakeApp("older.app", version: "1")
-    do {
+    _ = try await rejectsAsync {
       try await QingTypeAppInstallation.install(source: older, destination: destination, backups: backups) {}
-      throw SettingsError.invalid("downgrade accepted")
-    } catch { try expect(try QingTypeAppInstallation.version(at: destination) == "2", "older installation media cannot silently downgrade the input app") }
+    }
+    try expect(try QingTypeAppInstallation.version(at: destination) == "2", "older installation media cannot silently downgrade the input app")
     let link = root.appendingPathComponent("link.app")
     try manager.createSymbolicLink(at: link, withDestinationURL: destination)
-    do {
+    _ = try await rejectsAsync {
       try await QingTypeAppInstallation.install(source: source, destination: link, backups: backups) {}
-      throw SettingsError.invalid("link accepted")
-    } catch { try expect((try link.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink == true, "symlink install targets are preserved") }
+    }
+    try expect((try link.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink == true, "symlink install targets are preserved")
     let cache = root.appendingPathComponent("cache"), cacheBackup = root.appendingPathComponent("cache-backup")
     try manager.createDirectory(at: cache, withIntermediateDirectories: true)
     for name in QingTypeInputCache.names { try Data(name.utf8).write(to: cache.appendingPathComponent(name)) }

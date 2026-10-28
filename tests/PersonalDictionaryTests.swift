@@ -125,16 +125,17 @@ struct PersonalDictionaryTests {
     try expect(try Data(contentsOf: directory.appendingPathComponent("default.custom.yaml")) == manual && Data(contentsOf: learning) == sentinel,
                "external manual configuration and learning data remain intact")
     var unexpectedDeployment = false
+    var rejectedManualConfiguration = false
     do {
       _ = try await QingTypeConfigurationApply.apply(settings, to: directory) {
         unexpectedDeployment = true
         return deployment(true)
       }
-      throw SettingsError.invalid("expected manual ownership rejection")
     } catch is SettingsError {
-      try expect(!unexpectedDeployment && (try Data(contentsOf: directory.appendingPathComponent("default.custom.yaml"))) == manual,
-                 "rejected writes leave configuration unchanged and never invoke deployment")
+      rejectedManualConfiguration = true
     }
+    try expect(rejectedManualConfiguration && !unexpectedDeployment && (try Data(contentsOf: directory.appendingPathComponent("default.custom.yaml"))) == manual,
+               "rejected writes leave configuration unchanged and never invoke deployment")
     print("PASS: \(checks) personal dictionary, import/export and deployment-transaction checks")
   }
 }
