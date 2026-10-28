@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import Yams
+import Darwin
 
 struct DictionaryAsset: Codable, Equatable, Identifiable {
   var id: String
@@ -36,7 +37,8 @@ enum QingTypeContent {
     return hash.finalize().map { String(format: "%02x", $0) }.joined()
   }
 
-  static func importGrammar(from source: URL, into directory: URL) throws -> GrammarAsset {
+  static func importGrammar(from source: URL, into directory: URL, expectedSHA256: String? = nil,
+                            copy: (URL, URL) throws -> Void = { try FileManager.default.copyItem(at: $0, to: $1) }) throws -> GrammarAsset {
     try QingTypePaths.checkDirectory(directory)
     guard source.pathExtension.lowercased() == "gram" else {
       throw SettingsError.invalid("请选择 Rime 的 .gram 语言模型文件。")
@@ -59,16 +61,26 @@ enum QingTypeContent {
       throw SettingsError.invalid("模型索引超出文件范围，文件可能已损坏或下载不完整。")
     }
     let hash = try digest(of: source)
+    if let expectedSHA256, hash != expectedSHA256 {
+      throw SettingsError.invalid("模型源文件的 SHA-256 不符，请重新下载或导入。")
+    }
     let language = "qingtype_model_" + hash
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let destination = directory.appendingPathComponent(language + ".gram")
-    if !FileManager.default.fileExists(atPath: destination.path) {
+    var info = stat()
+    let exists = lstat(destination.path, &info) == 0
+    if !exists && errno != ENOENT { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    if exists && (info.st_mode & S_IFMT) != S_IFREG {
+      throw SettingsError.invalid("模型目标不是普通文件，已停止导入。")
+    }
+    if try !exists || digest(of: destination) != hash {
       let staging = directory.appendingPathComponent(".import-\(UUID()).gram")
       defer { try? FileManager.default.removeItem(at: staging) }
-      try FileManager.default.copyItem(at: source, to: staging)
+      try copy(source, staging)
       guard try digest(of: staging) == hash else { throw SettingsError.invalid("模型复制校验失败，请重新导入。") }
-      try FileManager.default.moveItem(at: staging, to: destination)
+      guard rename(staging.path, destination.path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
     }
+    guard try digest(of: destination) == hash else { throw SettingsError.invalid("模型目标校验失败，请重新导入。") }
     let name = source.deletingPathExtension().lastPathComponent
     return GrammarAsset(id: hash, name: name, language: language, byteCount: Int64(size), sha256: hash,
                         variant: name.contains("zh-hans") ? "hans" : name.contains("zh-hant") ? "hant" : nil)

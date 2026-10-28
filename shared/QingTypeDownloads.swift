@@ -155,10 +155,11 @@ enum QingTypeWanxiang {
     let file = directory.appendingPathComponent("qingtype_model_\(hash).gram")
     guard FileManager.default.fileExists(atPath: file.path) else { return result }
     let values = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
-    guard values.isRegularFile == true, values.isSymbolicLink != true,
-          Int64(values.fileSize ?? 0) == asset.size, try QingTypeContent.digest(of: file, checkingCancellation: true) == hash else {
+    guard values.isRegularFile == true, values.isSymbolicLink != true else {
       throw SettingsError.invalid("本地万象模型未通过文件校验，已停止更新检查，现有文件未改动。")
     }
+    guard Int64(values.fileSize ?? 0) == asset.size,
+          try QingTypeContent.digest(of: file, checkingCancellation: true) == hash else { return result }
     result.installed = model
     return result
   }

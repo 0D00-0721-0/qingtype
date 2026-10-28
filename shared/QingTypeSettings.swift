@@ -194,6 +194,17 @@ struct QingTypeSettings: Codable, Equatable {
     return files
   }
 
+  func verifyActiveModel(in directory: URL) throws {
+    if let activeModel {
+      let url = directory.appendingPathComponent(activeModel.language + ".gram")
+      let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+      guard values.isRegularFile == true, values.isSymbolicLink != true,
+            try QingTypeContent.digest(of: url) == activeModel.sha256 else {
+        throw SettingsError.invalid("已选模型校验失败，请重新导入；原设置未更改。")
+      }
+    }
+  }
+
   // All files are validated before writing. Restore previous contents if a write fails.
   // Refuse to replace a manually maintained patch without the management header.
   func save(to directory: URL = QingTypePaths.userDirectory) throws {
@@ -207,6 +218,7 @@ struct QingTypeSettings: Codable, Equatable {
     for name in required where !manager.fileExists(atPath: directory.appendingPathComponent(name).path) {
       throw SettingsError.invalid("缺少已启用的文件：\(name)，请重新导入。")
     }
+    try verifyActiveModel(in: directory)
     var previous: [String: Data] = [:]
     for name in files.keys {
       let url = directory.appendingPathComponent(name)

@@ -49,7 +49,8 @@ extension SettingsModel {
         canCancelDownload = false; transferProgress = nil; message = "正在校验模型并启用…"
         guard try QingTypeSettings.load() == original else { throw SettingsError.invalid("设置已被其他程序修改，请重开清言后重试。") }
         let file = downloaded!.file
-        var model = try await Task.detached { try QingTypeContent.importGrammar(from: file, into: QingTypePaths.userDirectory) }.value
+        let expectedSHA256 = downloaded!.sha256
+        var model = try await Task.detached { try QingTypeContent.importGrammar(from: file, into: QingTypePaths.userDirectory, expectedSHA256: expectedSHA256) }.value
         model.source = downloaded!.repository; model.release = downloaded!.release
         var updated = original
         updated.models.removeAll { $0.id == model.id }; updated.models.append(model); updated.activeModelID = model.id

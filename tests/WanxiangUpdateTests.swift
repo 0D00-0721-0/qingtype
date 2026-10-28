@@ -54,8 +54,8 @@ struct WanxiangUpdateTests {
 
     var damaged = payload; damaged[0] = 0x62
     try damaged.write(to: file)
-    try rejects { _ = try inspect() }
-    try expect(try Data(contentsOf: file) == damaged, "corrupt local file is reported without overwriting it or calling it current")
+    try expect(try inspect().installed == nil, "corrupt local model schedules a verified download instead of being called current")
+    try expect(try Data(contentsOf: file) == damaged, "inspection leaves corrupt local file unchanged until verified replacement")
     try payload.write(to: file)
     var noDigest = official; noDigest.assets[0].digest = nil
     try rejects { _ = try inspect(noDigest) }

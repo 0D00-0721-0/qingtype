@@ -54,6 +54,64 @@ struct ContentTests {
     try fake.write(to: fakeModel)
     try rejects { _ = try QingTypeContent.importGrammar(from: fakeModel, into: destination) }
 
+    // Synthetic grammar header with a bounded index; all model writes stay in the temporary directory.
+    let grammar = source.appendingPathComponent("fixture.gram")
+    var grammarBytes = Data(repeating: 0x61, count: 2048)
+    grammarBytes.replaceSubrange(0..<17, with: Data("Rime::Grammar/1.0".utf8))
+    grammarBytes.replaceSubrange(36..<44, with: [1, 0, 0, 0, 4, 0, 0, 0])
+    try grammarBytes.write(to: grammar)
+    let model = try QingTypeContent.importGrammar(from: grammar, into: destination)
+    let cached = destination.appendingPathComponent(model.language + ".gram")
+    try expect(try QingTypeContent.digest(of: cached) == model.sha256, "first import has verified bytes")
+    let repeated = try QingTypeContent.importGrammar(from: grammar, into: destination)
+    try expect(repeated.id == model.id && (try QingTypeContent.digest(of: cached)) == model.sha256, "repeat import reuses verified content")
+    try Data("damaged cache".utf8).write(to: cached)
+    _ = try QingTypeContent.importGrammar(from: grammar, into: destination)
+    try expect(try QingTypeContent.digest(of: cached) == model.sha256, "corrupt destination is replaced by verified source")
+    var modelSettings = QingTypeSettings()
+    modelSettings.models = [model]; modelSettings.activeModelID = model.id
+    try modelSettings.save(to: destination)
+    let previousSettings = try Data(contentsOf: destination.appendingPathComponent("settings.json"))
+    try Data("damaged after import".utf8).write(to: cached)
+    try rejects { try modelSettings.verifyActiveModel(in: destination) }
+    try rejects { try modelSettings.save(to: destination) }
+    try expect(try Data(contentsOf: destination.appendingPathComponent("settings.json")) == previousSettings,
+               "invalid active model is rejected before changing settings")
+    let corruptBefore = try Data(contentsOf: cached)
+    try rejects {
+      _ = try QingTypeContent.importGrammar(from: grammar, into: destination, expectedSHA256: String(repeating: "0", count: 64))
+    }
+    try expect(try Data(contentsOf: cached) == corruptBefore, "unexpected source hash does not replace cache")
+    var damagedSource = grammarBytes
+    damagedSource[100] ^= 0xff
+    try damagedSource.write(to: grammar)
+    try rejects { _ = try QingTypeContent.importGrammar(from: grammar, into: destination, expectedSHA256: model.sha256) }
+    try expect(try Data(contentsOf: cached) == corruptBefore, "damaged source is rejected against known hash")
+    try grammarBytes.write(to: grammar)
+    try rejects {
+      _ = try QingTypeContent.importGrammar(from: grammar, into: destination, expectedSHA256: model.sha256) { _, stage in
+        try Data("partial copy".utf8).write(to: stage)
+        throw SettingsError.invalid("simulated copy interruption")
+      }
+    }
+    try expect(try Data(contentsOf: cached) == corruptBefore, "interrupted copy preserves previous target")
+    try expect(try !FileManager.default.contentsOfDirectory(atPath: destination.path).contains { $0.hasPrefix(".import-") },
+               "interrupted copy removes staging file")
+    try rejects {
+      _ = try QingTypeContent.importGrammar(from: grammar, into: destination, expectedSHA256: model.sha256) { _, stage in
+        try Data("incorrect copy".utf8).write(to: stage)
+      }
+    }
+    try expect(try Data(contentsOf: cached) == corruptBefore, "copy with wrong hash never replaces target")
+    _ = try QingTypeContent.importGrammar(from: grammar, into: destination, expectedSHA256: model.sha256)
+    try modelSettings.save(to: destination)
+    try expect(try QingTypeContent.digest(of: cached) == model.sha256, "repaired model can be enabled")
+    try FileManager.default.removeItem(at: cached)
+    try FileManager.default.createSymbolicLink(at: cached, withDestinationURL: grammar)
+    try rejects { _ = try QingTypeContent.importGrammar(from: grammar, into: destination) }
+    try rejects { try modelSettings.save(to: destination) }
+    try expect(try Data(contentsOf: grammar) == grammarBytes, "symlink target is not modified")
+
     // Migration from the previous settings format preserves user's choices.
     let previous = Data("{\"schema\":\"luna_pinyin_simp\",\"fontSize\":21,\"layout\":\"stacked\"}".utf8)
     let migrated = try JSONDecoder().decode(QingTypeSettings.self, from: previous)

@@ -5,6 +5,7 @@ enum QingTypeMaintenance {
   static func deploy(api: RimeApi_stdbool, directory: URL = QingTypePaths.userDirectory) throws -> QingTypeDeploymentReport {
     let settings = try QingTypeSettings.load(from: directory)
     try settings.validate()
+    try settings.verifyActiveModel(in: directory)
     // Rime's schema freshness check has second-level timestamp granularity.
     // Immediate off/on saves must not reuse the previous compiled switch value.
     // Invalidate only this generated schema; user databases are never removed.
