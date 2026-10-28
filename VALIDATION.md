@@ -4,6 +4,34 @@ Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+## Installation state and idempotency audit — 2026-10-28
+
+Before the audit, pressing "重新检查并启用" after a successful install always ran the
+full transaction: copy the embedded bundle, back up the installed one, swap atomically,
+register and enable the input source again, and redeploy. The final state was stable, but
+the operation was not idempotent, and the UI had only `installedVersion` and
+`inputEnabled` booleans. A corrupted installed bundle could not be repaired at all: the
+installer compared versions first and threw when the old Info.plist was unreadable.
+
+The installer now detects `notInstalled`, `installedSameVersion`, `installedOlderVersion`,
+`installedNewerVersion` and `corrupted` from the filesystem (bundle identifier, executable,
+required runtime library and dictionary, version comparison, leftover staging directories).
+Equal and healthy installs only redeploy; the explicit "重新安装" entry performs the full
+replace; newer installs are protected; corrupted installs are repairable. Post-deploy
+verification re-checks the version and required files and throws, so the transaction rolls
+back. Model status now reads the `.gram` file size and SHA-256 instead of trusting the
+settings record alone, and a failed update check clears the previous candidate so no stale
+install button remains.
+
+`tests/InstallationStatusTests.swift` covers state detection, action mapping, verification,
+leftover staging, downgrade refusal, repeated equal-version installs, corrupted repair and
+the concurrent install lock; the full regression passes 180 checks. Manual acceptance steps
+are listed in `docs/QA_CHECKLIST.md`. Backups from each reinstall still accumulate under
+`~/Library/QingType/backups`, status detection does not verify code signatures (signatures
+are checked when copying and replacing), corrupted compiled artifacts are still repaired
+manually, and rapid clicking, power loss and cross-application input still need real-machine
+checks.
+
 ## 0.6.4 update-lock fix — 2026-10-28
 
 A real GUI self-update from 0.6.2 to 0.6.3 failed on this Mac. The installer

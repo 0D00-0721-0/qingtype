@@ -27,6 +27,7 @@ final class SettingsModel: ObservableObject {
   @Published var busy = false
   @Published var deployment: QingTypeDeploymentReport?
   @Published var installedVersion: String?
+  @Published var installationStatus: QingTypeInstallationStatus?
   @Published var inputEnabled = false
   @Published var transferProgress: QingTypeTransferProgress?
   @Published var canCancelDownload = false
@@ -372,6 +373,10 @@ struct SettingsView: View {
           if let asset = model.settings.activeModel {
             Text("\(ByteCountFormatter.string(fromByteCount: asset.byteCount, countStyle: .file)) · \(asset.variant == "hant" ? "繁体中文" : asset.variant == "hans" ? "简体中文" : "自定义模型") · 本地运行")
               .font(.callout).foregroundStyle(.secondary)
+            if QingTypeContent.modelFileState(asset, in: QingTypePaths.userDirectory) != .present {
+              Label("模型文件缺失或已损坏，请重新导入或检查模型更新。", systemImage: "exclamationmark.triangle.fill")
+                .font(.callout).foregroundStyle(.orange)
+            }
           }
           Button("导入模型…", systemImage: "square.and.arrow.down") { model.chooseImport(model: true) }
             .disabled(model.busy)

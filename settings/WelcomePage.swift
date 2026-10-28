@@ -4,21 +4,54 @@ import SwiftUI
 extension SettingsModel {
   func refreshInstallation() {
     refreshRuntimeModelStatus()
-    installedVersion = InstallationService.installedVersion
+    installationStatus = InstallationService.status()
+    installedVersion = installationStatus?.installedVersion
     Task { inputEnabled = (try? await InstallationService.state().enabled) ?? false }
+  }
+
+  var installAction: QingTypeInstallAction {
+    guard let status = installationStatus else { return .install }
+    return QingTypeInstallationCheck.action(for: status)
+  }
+
+  var installTitle: String {
+    switch installAction {
+    case .install: return "安装并启用清言"
+    case .update: return "更新输入法"
+    case .repair: return "修复安装"
+    case .deployOnly: return inputEnabled ? "已安装" : "启用清言"
+    case .blockedNewer: return "已安装较新版本"
+    case .reinstall: return "重新安装"
+    }
   }
 
   func installInputMethod() {
     guard !busy, !loadFailed else { return }
     guard !isDirty else { failed = true; message = "请先保存当前更改，再安装或修复输入法。"; return }
-    busy = true; failed = false; message = "正在安装清言并准备基础中文输入…"
+    busy = true; failed = false
+    message = installAction == .deployOnly ? "正在重新部署基础中文输入…" : "正在安装清言并准备基础中文输入…"
     Task {
       defer { busy = false; refreshInstallation() }
       do {
-        deployment = try await InstallationService.install()
+        deployment = try await InstallationService.install(mode: .automatic)
         settings = try .load(); saved = settings
         inputEnabled = (try? await InstallationService.state().enabled) ?? false
         message = inputEnabled ? "清言已安装并启用，可以从系统输入菜单选择清言开始输入。" : "清言已安装。请打开键盘设置添加清言，再开始输入。"
+      } catch { failed = true; message = error.localizedDescription }
+    }
+  }
+
+  func reinstallInputMethod() {
+    guard !busy, !loadFailed else { return }
+    guard !isDirty else { failed = true; message = "请先保存当前更改，再重新安装输入法。"; return }
+    busy = true; failed = false; message = "正在重新安装清言输入法…"
+    Task {
+      defer { busy = false; refreshInstallation() }
+      do {
+        deployment = try await InstallationService.install(mode: .reinstall)
+        settings = try .load(); saved = settings
+        inputEnabled = (try? await InstallationService.state().enabled) ?? false
+        message = "清言输入法已重新安装并启用。"
       } catch { failed = true; message = error.localizedDescription }
     }
   }
@@ -86,6 +119,7 @@ extension SettingsModel {
 
 struct WelcomePage: View {
   @ObservedObject var model: SettingsModel
+  @State private var confirmReinstall = false
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
       HStack(spacing: 18) {
@@ -104,11 +138,23 @@ struct WelcomePage: View {
             .font(.callout).foregroundStyle(.secondary)
           HStack {
             if InstallationService.payload != nil || model.installedVersion != nil {
-              Button(installTitle, action: model.installInputMethod).buttonStyle(.borderedProminent)
-                .disabled(model.busy || model.loadFailed)
+              if model.installAction == .deployOnly && model.inputEnabled {
+                Label(model.installTitle, systemImage: "checkmark.circle.fill")
+                  .font(.callout).foregroundStyle(.secondary)
+                Button("重新安装…") { confirmReinstall = true }
+                  .disabled(model.busy || model.loadFailed)
+              } else if model.installAction == .blockedNewer {
+                Label("已安装较新版本 \(model.installedVersion ?? "")", systemImage: "checkmark.circle.fill")
+                  .font(.callout).foregroundStyle(.secondary)
+              } else {
+                Button(model.installTitle, action: model.installInputMethod).buttonStyle(.borderedProminent)
+                  .disabled(model.busy || model.loadFailed || model.installAction == .blockedNewer)
+              }
             }
             Button("打开键盘设置", action: model.openKeyboardSettings).disabled(model.busy)
-            if let version = model.installedVersion { Text("已安装 \(version)").font(.caption).foregroundStyle(.secondary) }
+            if let version = model.installedVersion, model.installAction != .deployOnly {
+              Text("已安装 \(version)").font(.caption).foregroundStyle(.secondary)
+            }
           }
           if model.inputReady { Button("切换到清言", action: model.selectQingType).disabled(model.busy) }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
@@ -140,11 +186,12 @@ struct WelcomePage: View {
       Text("下载组件需要网络；日常输入、个人词库和已安装的模型均在本机运行。")
         .font(.caption).foregroundStyle(.secondary)
     }.onAppear { model.refreshInstallation() }
-  }
-  private var installTitle: String {
-    guard let installed = model.installedVersion else { return "安装并启用清言" }
-    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-    return (version?.compare(installed, options: .numeric) == .orderedDescending) && InstallationService.payload != nil ? "更新输入法" : "重新检查并启用"
+    .alert("重新安装清言输入法？", isPresented: $confirmReinstall) {
+      Button("取消", role: .cancel) {}
+      Button("重新安装") { model.reinstallInputMethod() }
+    } message: {
+      Text("会中断当前输入，重新复制程序并重新部署；个人词库、学习记录和设置保留。")
+    }
   }
 }
 
@@ -158,8 +205,11 @@ struct WanxiangCard: View {
           .font(.callout).foregroundStyle(.secondary)
         HStack {
           if let active = model.settings.activeModel {
-            Label(model.runtimeModelWarning == nil ? "已启用：\(active.name)" : "最近启动未启用：\(active.name)",
-                  systemImage: model.runtimeModelWarning == nil ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+            let fileState = QingTypeContent.modelFileState(active, in: QingTypePaths.userDirectory)
+            let broken = fileState != .present
+            Label(broken ? "模型文件缺失或已损坏：\(active.name)"
+                         : model.runtimeModelWarning == nil ? "已启用：\(active.name)" : "最近启动未启用：\(active.name)",
+                  systemImage: broken || model.runtimeModelWarning != nil ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
               .font(.callout).foregroundStyle(.secondary)
           }
           Button(model.settings.models.isEmpty ? "下载安装并启用万象" : "检查模型更新", action: model.checkWanxiangUpdate)

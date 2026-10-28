@@ -115,7 +115,11 @@ extension SettingsModel {
           let order = update.version.compare(current, options: .numeric)
           updateSummary = order == .orderedDescending ? "可更新到 \(update.version)。" : order == .orderedSame ? "已是当前公开版本。" : "当前版本高于公开发布的 \(update.version)。"
         } else { updateSummary = "暂时没有适合这台 Mac 的安装包。" }
-      } catch { updateSummary = error.localizedDescription }
+      } catch {
+        // Never keep an older candidate around: a failed check must not offer an install.
+        appUpdate = nil
+        updateSummary = "检查失败：\(error.localizedDescription)"
+      }
     }
   }
 

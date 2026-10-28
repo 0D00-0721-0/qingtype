@@ -51,12 +51,14 @@ enum QingTypeAppInstallation {
     defer { withExtendedLifetime(heldLock) {} }
     guard heldLock.destination == destination.standardizedFileURL else { throw SettingsError.invalid("安装锁与目标不匹配。") }
     let existed = manager.fileExists(atPath: destination.path)
-    if existed {
-      let currentVersion = try version(at: destination)
+    if existed, let currentVersion = try? version(at: destination) {
+      // A readable older install is upgraded; a readable newer one is protected.
       guard sourceVersion.compare(currentVersion, options: .numeric) != .orderedAscending else {
         throw SettingsError.invalid("已安装的输入法比此安装包更新，请使用新版清言应用。")
       }
     }
+    // An unreadable install cannot be compared and is treated as repairable:
+    // the caller has already detected the corruption and chose to repair it.
     let stage = destination.deletingLastPathComponent().appendingPathComponent(".qingtype-stage-\(UUID())")
     var stageContainsOld = false
     defer { if !stageContainsOld { try? manager.removeItem(at: stage) } }

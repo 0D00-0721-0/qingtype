@@ -2,6 +2,17 @@
 
 更新时间：2026-10-28（Asia/Shanghai）。目标/边界见 AGENTS.md，验收标准见 ROADMAP.md。
 
+## 安装与更新状态审计（2026-10-28）
+
+- 修复前行为：已安装后点「重新检查并启用」总是走完整事务——复制 bundle、备份、原子替换、重复注册/启用输入源、重新部署。最终状态一致，但操作不幂等，且没有状态模型：UI 只有 `installedVersion` 和 `inputEnabled` 两个 Bool。
+- 新增 `QingTypeInstallationStatus`：`notInstalled` / `installedSameVersion` / `installedOlderVersion` / `installedNewerVersion` / `corrupted`，检查安装目录、bundle id、可执行文件、必要运行库与词典、版本比较，并报告遗留的 `.qingtype-stage-*`；`action` 映射为 install / deployOnly / update / repair / blockedNewer。
+- `InstallationService.install(mode:)`：`.automatic` 在版本相同且完整时只重新部署（不复制、不备份、不替换、不重复注册），`.reinstall` 才是显式的完整替换。部署后调用 `verify` 重新校验版本与必要文件，失败触发事务回滚；回滚前停止服务。
+- 修复损坏安装：无法读取版本的旧 bundle 不再被版本比较挡住，按修复路径替换并保留旧包备份（此前「修复安装」会直接抛错，实际不可用）。
+- UI：已安装且健康时显示「已安装」，另提供「重新安装…」并需确认；新增/更新/修复分别显示对应按钮；已安装较新版本时拒绝覆盖。模型卡片与模型页读取 `.gram` 的真实文件状态（存在/大小/SHA-256），缺失或损坏时提示，不再只依赖设置记录。
+- 更新检查：失败时清空候选版本并显示「检查失败」，不会残留旧的安装按钮；重复检查由 `busy` 串行化，自动检查仍受 24 小时间隔约束。
+- 测试：新增 `tests/InstallationStatusTests.swift`（状态检测、动作映射、安装后校验、遗留目录、降级保护、重复安装、损坏修复、并发安装锁），已接入 `scripts/test.sh`；错误注入类事务测试仍覆盖注册/启用失败后的恢复。完整回归 180 项 PASS。人工清单见 `docs/QA_CHECKLIST.md`。
+- 未解决：安装备份目录（`backups/install-*`）会随重装累积，未自动清理；状态检测不校验代码签名（签名只在安装和替换时校验）；编译产物损坏后仍不会自动重建；快速连点、断电恢复与跨应用输入需要按清单人工验收。
+
 ## 0.6.3 升级失败与 0.6.4 修复（2026-10-28）
 
 - 用户从 0.6.2 通过 GUI 自更新到 0.6.3 时失败，报「安装失败，程序已恢复，但输入源或缓存恢复未确认」「配置已恢复，但恢复后的编译未通过」「部署失败：清言正在输入或管理数据」。原因：安装流程启用输入源后 macOS 立即拉起输入服务，服务持有共享数据锁 `~/Library/QingType/.qingtype-data.lock`；随后部署 worker（`--deploy-user-data`，独占锁）必然失败。回滚又把新程序换入临时目录并删除，运行中的服务于是继续指向已删除的 `.qingtype-stage-*`。缓存恢复失败只涉及各应用自己的输入源缓存，系统会重建。

@@ -24,7 +24,24 @@ struct GrammarAsset: Codable, Equatable, Identifiable {
   var importedAt = Date()
 }
 
+/// File truth for a registered model. Settings records are only a cache: a
+/// model counts as installed only while its file still matches size and hash.
+enum QingTypeModelFileState: Equatable {
+  case present
+  case missing
+  case invalid
+}
+
 enum QingTypeContent {
+  static func modelFileState(_ asset: GrammarAsset, in directory: URL) -> QingTypeModelFileState {
+    let url = directory.appendingPathComponent(asset.language + ".gram")
+    guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
+          values.isRegularFile == true, values.isSymbolicLink != true else { return .missing }
+    guard Int64(values.fileSize ?? 0) == asset.byteCount else { return .invalid }
+    guard (try? digest(of: url)) == asset.sha256 else { return .invalid }
+    return .present
+  }
+
   static func digest(of url: URL, checkingCancellation: Bool = false) throws -> String {
     if checkingCancellation { try Task.checkCancellation() }
     let file = try FileHandle(forReadingFrom: url)

@@ -26,6 +26,8 @@ build/rime-ice-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/SetupTests.swift "${yaml_flags[@]}" -o build/setup-tests
 build/setup-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/InstallationTransactionTests.swift "${yaml_flags[@]}" -o build/installation-transaction-tests
+swiftc -parse-as-library -swift-version 5 shared/*.swift tests/InstallationStatusTests.swift "${yaml_flags[@]}" -o build/installation-status-tests
+build/installation-status-tests
 build/installation-transaction-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/UninstallSafetyTests.swift "${yaml_flags[@]}" -o build/uninstall-safety-tests
 build/uninstall-safety-tests
