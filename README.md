@@ -1,11 +1,11 @@
 # 清言输入法 · QingType
 
 基于 Rime 与鼠须管的开源 macOS 输入法。目标是用 Mac 原生界面完成日常输入、
-自定义词库添加及万象等本地语言模型管理。当前版本 **0.6.2 预览版**，GPL-3.0。
+自定义词库添加及万象等本地语言模型管理。当前源码版本 **0.6.3 预览版**，GPL-3.0。
 
 ## 使用
 
-[下载 0.6.2 预览版（M 芯片 Mac）](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.2-preview.1)。请下载 Assets 中的 DMG，Source code 为源码。
+[下载预览版（M 芯片 Mac）](https://github.com/0D00-0721-0/qingtype/releases)。请下载 Assets 中的 DMG，Source code 为源码。
 
 打开 DMG，将「清言.app」拖入「Applications」，再打开清言。
 在「开始使用」点击「安装并启用清言」，完成后点击「切换到清言」或使用系统输入菜单。
