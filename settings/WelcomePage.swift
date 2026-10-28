@@ -7,6 +7,7 @@ extension SettingsModel {
     installationStatus = InstallationService.status()
     installedVersion = installationStatus?.installedVersion
     Task { inputEnabled = (try? await InstallationService.state().enabled) ?? false }
+    refreshModelFileStates()
     // The full signature check runs off the main thread; a broken install then
     // switches the button to "修复安装" instead of "已安装".
     Task.detached {
@@ -214,8 +215,8 @@ struct WanxiangCard: View {
           .font(.callout).foregroundStyle(.secondary)
         HStack {
           if let active = model.settings.activeModel {
-            let fileState = QingTypeContent.modelFileState(active, in: QingTypePaths.userDirectory)
-            let broken = fileState != .present
+            let fileState = model.modelFileStates[active.id]
+            let broken = fileState != nil && fileState != .present
             Label(broken ? "模型文件缺失或已损坏：\(active.name)"
                          : model.runtimeModelWarning == nil ? "已启用：\(active.name)" : "最近启动未启用：\(active.name)",
                   systemImage: broken || model.runtimeModelWarning != nil ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")

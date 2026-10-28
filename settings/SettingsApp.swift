@@ -37,6 +37,7 @@ final class SettingsModel: ObservableObject {
   @Published var appUpdate: QingTypeAppUpdate?
   @Published var updateSummary: String?
   @Published var runtimeModelWarning: String?
+  @Published var modelFileStates: [String: QingTypeModelFileState] = [:]
   var componentTask: Task<Void, Never>?
 
 
@@ -50,6 +51,7 @@ final class SettingsModel: ObservableObject {
     catch { loadFailed = true; failed = true; message = "无法读取设置：\(error.localizedDescription)" }
     refreshRuntimeModelStatus()
     refreshInstallation()
+    refreshModelFileStates()
     do {
       maintenance = try .load()
       if try ProgramMaintenanceService.pendingUpdate() != nil { completePendingAppUpdate() }
@@ -60,6 +62,18 @@ final class SettingsModel: ObservableObject {
   var isDirty: Bool { settings != saved }
   func refreshRuntimeModelStatus() {
     runtimeModelWarning = QingTypeRuntimeModel.readStatus(in: QingTypePaths.userDirectory)?.message
+  }
+
+  /// Hashing a model is expensive (hundreds of MB), so it never runs from a
+  /// SwiftUI body: the result is cached and refreshed in the background.
+  func refreshModelFileStates() {
+    let models = settings.models
+    let directory = QingTypePaths.userDirectory
+    Task.detached {
+      var states: [String: QingTypeModelFileState] = [:]
+      for model in models { states[model.id] = QingTypeContent.modelFileState(model, in: directory) }
+      await MainActor.run { self.modelFileStates = states }
+    }
   }
   var inputReady: Bool {
     guard inputEnabled, let installedVersion, let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else { return false }
@@ -85,6 +99,7 @@ final class SettingsModel: ObservableObject {
         saved = draft
         deployment = report
         message = report.message
+        refreshModelFileStates()
       } catch {
         failed = true
         message = error.localizedDescription
@@ -131,6 +146,7 @@ final class SettingsModel: ObservableObject {
           }.value
           settings.dictionaries.append(contentsOf: imported)
         }
+        refreshModelFileStates()
         message = "已导入，点击“保存并应用”后生效。"
       } catch { failed = true; message = error.localizedDescription }
     }
@@ -255,6 +271,9 @@ struct SettingsView: View {
     .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
       model.refreshRuntimeModelStatus()
     }
+    .onChange(of: model.section) { _, section in
+      if section == .models || section == .welcome { model.refreshModelFileStates() }
+    }
   }
 
   private var subtitle: String {
@@ -373,7 +392,7 @@ struct SettingsView: View {
           if let asset = model.settings.activeModel {
             Text("\(ByteCountFormatter.string(fromByteCount: asset.byteCount, countStyle: .file)) · \(asset.variant == "hant" ? "繁体中文" : asset.variant == "hans" ? "简体中文" : "自定义模型") · 本地运行")
               .font(.callout).foregroundStyle(.secondary)
-            if QingTypeContent.modelFileState(asset, in: QingTypePaths.userDirectory) != .present {
+            if let state = model.modelFileStates[asset.id], state != .present {
               Label("模型文件缺失或已损坏，请重新导入或检查模型更新。", systemImage: "exclamationmark.triangle.fill")
                 .font(.callout).foregroundStyle(.orange)
             }
