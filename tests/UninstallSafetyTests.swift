@@ -12,7 +12,7 @@ final class FakeUninstallSources {
   var fallbackCalls = 0
 
   func read() throws -> QingTypeUninstallSnapshot {
-    .init(current: current, modes: [hans, hant].map { .init(id: $0, registered: true, enabled: enabled.contains($0), selected: current == $0) })
+    .init(current: current, modes: [hans, hant].map { .init(id: $0, registered: true, enabled: enabled.contains($0), selected: current == $0) }, parentEnabled: false)
   }
   func fallback() throws {
     fallbackCalls += 1
@@ -58,6 +58,27 @@ struct UninstallSafetyTests {
     let active = FakeUninstallSources(); active.enabled = [active.hans]; active.current = active.hans
     _ = try active.prepare()
     try expect(active.current == "com.apple.keylayout.ABC" && active.enabled.isEmpty && active.fallbackCalls == 1, "current source must switch before disable")
+    let parentDisabled = QingTypeUninstallSnapshot(current: "com.apple.keylayout.ABC", modes: [
+      .init(id: active.hans, registered: true, enabled: true, selected: false)
+    ], parentEnabled: false)
+    _ = try expectFailure({ try QingTypeUninstallGuard.verify(parentDisabled) }, "enabled mode despite disabled parent")
+    try QingTypeUninstallGuard.verify(.init(current: "com.apple.keylayout.ABC", modes: [
+      .init(id: active.hans, registered: true, enabled: false, selected: false)
+    ], parentEnabled: false))
+    _ = try expectFailure({ try QingTypeUninstallGuard.verify(.init(current: "com.apple.keylayout.ABC", modes: [
+      .init(id: active.hans, registered: true, enabled: false, selected: false)
+    ])) }, "unknown parent with registered mode")
+    try QingTypeUninstallGuard.verify(.init(current: "com.apple.keylayout.ABC", modes: [
+      .init(id: active.hans, registered: false, enabled: false, selected: false)
+    ]))
+    let parentEnabled = QingTypeUninstallSnapshot(current: "com.apple.keylayout.ABC", modes: [
+      .init(id: active.hans, registered: true, enabled: false, selected: false)
+    ], parentEnabled: true)
+    _ = try expectFailure({ try QingTypeUninstallGuard.verify(parentEnabled) }, "enabled parent source")
+    let inconsistentSelection = QingTypeUninstallSnapshot(current: "com.apple.keylayout.ABC", modes: [
+      .init(id: active.hans, registered: true, enabled: true, selected: true)
+    ], parentEnabled: false)
+    _ = try expectFailure({ try QingTypeUninstallGuard.verify(inconsistentSelection) }, "selected mode despite disabled parent")
     let noFallback = FakeUninstallSources(); noFallback.enabled = [noFallback.hans]; noFallback.current = noFallback.hans; noFallback.hasFallback = false
     _ = try expectFailure({ _ = try noFallback.prepare() }, "no fallback")
     try expect(noFallback.fallbackCalls == 1 && noFallback.current == noFallback.hans && noFallback.enabled == [noFallback.hans], "no fallback keeps source")

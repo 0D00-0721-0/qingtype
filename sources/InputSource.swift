@@ -121,6 +121,13 @@ final class SquirrelInstaller {
   }
 
   func uninstallSnapshot() throws -> QingTypeUninstallSnapshot {
+    let parentEnabled: Bool?
+    if let parent = inputSources[QingTypeUninstallGuard.prefix] {
+      guard let enabled = getBool(for: parent, key: kTISPropertyInputSourceIsEnabled) else {
+        throw SettingsError.invalid("无法确认清言父输入源状态，已停止卸载。")
+      }
+      parentEnabled = enabled
+    } else { parentEnabled = nil }
     let modes = try InputMode.allCases.map { mode -> QingTypeUninstallSnapshot.Mode in
       guard let source = inputSources[mode.rawValue] else { return .init(id: mode.rawValue, registered: false, enabled: false, selected: false) }
       guard let enabled = getBool(for: source, key: kTISPropertyInputSourceIsEnabled),
@@ -129,7 +136,7 @@ final class SquirrelInstaller {
       }
       return .init(id: mode.rawValue, registered: true, enabled: enabled, selected: selected)
     }
-    return .init(current: currentID(), modes: modes)
+    return .init(current: currentID(), modes: modes, parentEnabled: parentEnabled)
   }
 
   func prepareUninstall() throws -> [[String: Any]] {

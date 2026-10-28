@@ -9,6 +9,8 @@ struct QingTypeUninstallSnapshot {
   }
   var current: String?
   var modes: [Mode]
+  // Check the parent as well as the individual input modes.
+  var parentEnabled: Bool? = nil
 }
 
 enum QingTypeUninstallGuard {
@@ -25,8 +27,10 @@ enum QingTypeUninstallGuard {
 
   static func verify(_ state: QingTypeUninstallSnapshot) throws {
     guard let current = state.current, !current.hasPrefix(prefix),
-          state.modes.allSatisfy({ !$0.enabled && !$0.selected }) else {
-      throw SettingsError.invalid("未确认切换到其他输入源并停用清言，已停止卸载。")
+          state.modes.allSatisfy({ !$0.enabled && !$0.selected }),
+          (state.parentEnabled == false ||
+           (state.parentEnabled == nil && state.modes.allSatisfy({ !$0.registered }))) else {
+      throw SettingsError.invalid("未确认切换到其他输入源并停用清言，已停止卸载并保留程序。请检查系统输入法列表；若仍无法停用，请在清言设置中导出诊断。")
     }
   }
 
@@ -59,7 +63,8 @@ enum QingTypeUninstallGuard {
           let newEnabled = Set(after.modes.filter(\.enabled).map(\.id))
           let oldSelected = Set(previous.modes.filter(\.selected).map(\.id))
           let newSelected = Set(after.modes.filter(\.selected).map(\.id))
-          guard oldEnabled == newEnabled, oldSelected == newSelected, previous.current == after.current else {
+          guard oldEnabled == newEnabled, oldSelected == newSelected, previous.current == after.current,
+                previous.parentEnabled == after.parentEnabled else {
             throw SettingsError.invalid("输入源状态与卸载前不同。")
           }
         } catch { throw SettingsError.invalid("卸载已停止，输入源恢复未确认：\(reason)；\(error.localizedDescription)") }
