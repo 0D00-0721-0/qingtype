@@ -38,6 +38,7 @@ enum QingTypeConfigurationApply {
       saved = true
       let report = try await deploy()
       guard report.success else { throw SettingsError.invalid(report.message) }
+      try? QingTypeBackupRetention.markOwned(backup)
       return report
     } catch {
       if !saved {

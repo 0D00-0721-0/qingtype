@@ -117,6 +117,7 @@ enum InstallationService {
       }
     }
     guard let report else { throw SettingsError.invalid("输入法尚未完成初始化。") }
+    try? QingTypeBackupRetention.markOwned(backup)
     pruneBackups()
     return report
   }

@@ -21,20 +21,33 @@ struct MaintenanceRecoveryTests {
       try fm.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -age)], ofItemAtPath: url.path)
       return url
     }
-    let newest = try makeDirectory("install-newest", age: 10)
-    let middle = try makeDirectory("apply-middle", age: 100)
-    _ = try makeDirectory("install-oldest", age: 1_000)
+    let newest = try makeDirectory("install-11111111-1111-4111-8111-111111111111", age: 10)
+    let middle = try makeDirectory("apply-22222222-2222-4222-8222-222222222222", age: 100)
+    let oldest = try makeDirectory("install-33333333-3333-4333-8333-333333333333", age: 1_000)
+    for owned in [newest, middle, oldest] { try QingTypeBackupRetention.markOwned(owned) }
+    for (owned, age) in [(newest, 10.0), (middle, 100.0), (oldest, 1_000.0)] {
+      try fm.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -age)], ofItemAtPath: owned.path)
+    }
+    let personal = try makeDirectory("install-personal-copy", age: 2_000)
+    let unmarked = try makeDirectory("install-44444444-4444-4444-8444-444444444444", age: 2_000)
+    let renamed = backups.appendingPathComponent("install-55555555-5555-4555-8555-555555555555")
+    try fm.copyItem(at: oldest, to: renamed)
+    let modified = try makeDirectory("install-66666666-6666-4666-8666-666666666666", age: 2_000)
+    try QingTypeBackupRetention.markOwned(modified)
+    try Data("personal".utf8).write(to: modified.appendingPathComponent("my-copy.txt"))
     let learning = try makeDirectory("learning-backup", age: 1_000)
     let appUpdate = try makeDirectory("app-update-1", age: 1_000)
     try Data("not a backup".utf8).write(to: backups.appendingPathComponent("install-file.txt"))
     let removed = try QingTypeBackupRetention.prune(in: backups, prefixes: ["install-", "apply-"], keeping: 2)
-    try expect(removed.map(\.lastPathComponent) == ["install-oldest"], "retention removes only the oldest transaction backup")
+    try expect(removed.map(\.lastPathComponent) == [oldest.lastPathComponent], "retention removes only the oldest owned transaction backup")
     try expect(fm.fileExists(atPath: newest.path) && fm.fileExists(atPath: middle.path),
                "retention keeps the newest backups")
     try expect(fm.fileExists(atPath: learning.path) && fm.fileExists(atPath: appUpdate.path),
                "retention never touches learning backups or app-update receipts")
     try expect(fm.fileExists(atPath: backups.appendingPathComponent("install-file.txt").path),
                "retention never removes plain files")
+    try expect([personal, unmarked, renamed, modified].allSatisfy { fm.fileExists(atPath: $0.path) },
+               "retention preserves user-named, unmarked, renamed and modified directories")
 
     // Build artifacts are moved aside and restored, so a failed rebuild is safe.
     try expect(QingTypeBuildRecovery.isCompileFailure(SettingsError.invalid("部署失败：dictionary 'qingtype_main' failed to compile.")),
