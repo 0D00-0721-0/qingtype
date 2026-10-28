@@ -4,6 +4,32 @@ Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+## 0.6.3 preview publication — 2026-10-28
+
+Source commit 8eac967 (VERSION 0.6.3, clean working tree) passed the full local
+regression in required Rime Ice fixture mode (173 checks, no failures, including
+38 installation, 20 Wanxiang, 26 maintenance and 65 learning checks) and the
+mounted local DMG check. Push CI
+[40659394836](https://github.com/0D00-0721-0/qingtype/actions/runs/40659394836)
+passed on macOS 14/15/26 Apple Silicon; tag `v0.6.3-preview.1` and release
+workflow
+[40660691036](https://github.com/0D00-0721-0/qingtype/actions/runs/40660691036)
+produced the public prerelease
+[v0.6.3-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.3-preview.1).
+
+The downloaded DMG (16,974,171 bytes, SHA-256
+`20eba9ef059da565869c4c2d7c6fefccc7bf4e96a1cc6c7a12039418816d1ec7`) matched its
+`.sha256` file and the GitHub asset digest. Both bundles report 0.6.3, BuildInfo
+is clean 8eac967/arm64/macOS 14.0, the ad-hoc signature verifies, and the
+mounted package passed 18 offline engine checks plus `DistributionTests.py`
+(identity, minimum OS, license hashes, no personal or optional data, offline
+Chinese candidates). The source archive
+(`2c9a6055714760e348ff1826ee2ac7737ddb093530f35fb4eafd2cc3454b62b4`) has
+VERSION 0.6.3 and contains no learning databases, settings, models or absolute
+user paths. The public package was not installed on this Mac, which still runs
+the 0.6.2 development build; real uninstall, cross-application input,
+multi-display/sleep/long-run behaviour and GUI self-update remain unverified.
+
 ## Wanxiang update checks and stalled requests — 0.6.2
 
 Existing-model buttons now check the official LTS SHA-256 before downloading.

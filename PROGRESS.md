@@ -2,6 +2,16 @@
 
 更新时间：2026-10-28（Asia/Shanghai）。目标/边界见 AGENTS.md，验收标准见 ROADMAP.md。
 
+## 0.6.3 预览发布（2026-10-28）
+
+- 版本提交 `a0a5537`（VERSION 0.6.3）与文档提交 `8eac967`（README/INSTALLATION/RELEASE_NOTES 说明 0.6.3 及卸载限制）已推送到 `origin/main`。
+- 同源码本机 arm64 干净构建（8eac967、`workingTreeClean=true`、0.6.3）；以 CI 必需雾凇夹具模式运行完整 `scripts/test.sh`：173 项 PASS、0 失败，含 38 项安装、20 项万象、26 项维护、65 项学习及候选/输入边界/引擎检查；本机 DMG 打包与 `DistributionTests.py` 通过。本机构建 17,746,165 字节、SHA-256 3e53307a…，未发布，也不代表与 CI 产物字节一致。
+- 推送触发的 [CI 40659394836](https://github.com/0D00-0721-0/qingtype/actions/runs/40659394836) macOS 14/15/26 Apple Silicon 全通过。
+- 轻量 tag `v0.6.3-preview.1` 指向 `8eac967`；[发布工作流 40660691036](https://github.com/0D00-0721-0/qingtype/actions/runs/40660691036) 三系统构建/测试/打包与 publish 全通过。公开 [v0.6.3-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.3-preview.1) 为非草稿预览版，只有 arm64。
+- 实际下载发布资产核对：DMG 16,974,171 字节、SHA-256 **20eba9ef059da565869c4c2d7c6fefccc7bf4e96a1cc6c7a12039418816d1ec7**，与 `.sha256` 文件和 GitHub 服务端 digest 一致；只读挂载后「清言.app」与内嵌输入服务均为 0.6.3、BuildInfo 为干净的 8eac967/arm64/macOS 14.0、临时签名校验通过，18 项离线引擎检查与 `DistributionTests.py`（身份、最低系统、许可哈希、无个人/可选数据、离线中文候选）通过。源码 tar.gz 610,990 字节、SHA-256 **2c9a6055714760e348ff1826ee2ac7737ddb093530f35fb4eafd2cc3454b62b4**，VERSION 为 0.6.3，未含学习库、设置、模型或个人路径。
+- 公开包未安装到本机；本机仍是 0.6.2 开发构建。真实卸载、跨应用输入、多屏/休眠/长期运行与 GUI 自更新仍未验收，发布完成不等于 Phase 3/7 通过。
+- 本地证据：`build/063-build.log`、`063-test.log`、`063-package.log`、`063-distribution-test.log`、`063-release-distribution-test.log`；下载的发布资产在 `build/release-063/`（被忽略，不上传）。
+
 ## GitHub 同步准备（2026-10-28）
 
 - GitHub 阻止提交公开私人邮箱；仅重写尚未推送的本地提交，改用账户 noreply 地址，逐提交内容和提交主题不变。历史记录中旧提交号仍与实际安装时的 BuildInfo 对应；其等价新提交为 `1f0e5cc` → `ee8a50b`、`fb75e61` → `5797282`、`fc0b8be` → `e472e15`、`2238126` → `a6b940d`、`bb52f04` → `5b26e50`。本机实际安装包仍记录旧提交号，不能称为已重新构建或与远端构建字节一致。
@@ -107,8 +117,9 @@
 
 ## 当前版本与支持范围
 
-本机已安装 **0.6.2 开发修复版**，公开预览为 **0.6.2**；仅支持 M 芯片 Mac，macOS 14+。
-新发布 [v0.6.2-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.2-preview.1)，tag 为 0c3f156f2c44ce1b53374b72ff1f1149e51f3404。用户明确不再开发/验收 Intel，此约束已写入 AGENTS.md、构建入口和 CI。
+本机已安装 **0.6.2 开发修复版**；最新公开预览为 **0.6.3**；仅支持 M 芯片 Mac，macOS 14+。
+新发布 [v0.6.3-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.3-preview.1)，tag 指向 8eac967d8e571dd81a9e15dc562df014cf55b0d5，DMG SHA-256 20eba9ef059da565869c4c2d7c6fefccc7bf4e96a1cc6c7a12039418816d1ec7。
+上一版 [v0.6.2-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.2-preview.1)，tag 为 0c3f156f2c44ce1b53374b72ff1f1149e51f3404。用户明确不再开发/验收 Intel，此约束已写入 AGENTS.md、构建入口和 CI。
 历史基线 [v0.6.1-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.1-preview.1)，非草稿、预览版。tag 指向 fffae68ec5b6c99d864ef4033865f8603d2b39c2；main 后继 e638a42 只改测试镜像清理和进度记录，未移动 tag。
 
 ## 已完成
@@ -144,9 +155,9 @@
 
 ## 下一步与尚未完成的验收
 
-0. 先解决实际卸载时 macOS TIS 停用状态不一致，以及停用父输入源后无法通过 API 可靠恢复的问题；不得在未确认恢复的情况下再次强制停用。输入服务和设置应用已重新安装 1f0e5cc 构建，用户确认候选框正常显示；最新卸载保护已安装，自动卸载仍不可用。
+0. 先解决实际卸载时 macOS TIS 停用状态不一致，以及停用父输入源后无法通过 API 可靠恢复的问题；不得在未确认恢复的情况下再次强制停用。本机输入服务与设置应用仍是 0.6.2 开发构建；最新卸载保护已随源码发布，但自动卸载仍不可用。
 1. 个人词库编辑/删除/批量导入、重启后的真人结果仍需逐项记录；不能把新建+重新应用保留当作全部 Phase 1 人工验收。
-2. 自更新的程序事务已隔离验证，正常安装器和生产程序替换真实运行过；两个公开维护版之间的完整 GUI 自更新仍待下一次版本升级。干净/可恢复 Mac 仍需安装→输入→升级→卸载→数据保留图形验收，本机未为测试实际卸载。
+2. 0.6.3 公开包已发布，可作为下一次 GUI 自更新的目标版本（本机 0.6.2 → 0.6.3）；自更新程序事务已隔离验证，正常安装器和生产程序替换真实运行过，但完整 GUI 自更新仍未执行。干净/可恢复 Mac 仍需安装→输入→升级→卸载→数据保留图形验收，本机未为测试实际卸载。
 3. 继续 docs/COMPATIBILITY.md 中其他应用、数字/翻页/编辑组合、真实多屏/缩放/全屏/休眠和长时间使用，按控件记录，不用内部检查替代真实输入。
 4. 有效签名身份仍为 0：临时签名、未公证预览可从 GitHub 下载；Developer ID、公证与默认系统信任需真实证书。完整运行库源码重建/分发溯源审计仍有记录限制。
 5. Phase 1–6 已有实现及自动化覆盖；仍须完成真实故障回滚、卸载、输入与模型降级验收。Phase 7 矩阵基础设施已建立，真实应用和环境验收待继续；Phase 8 App Store 最小实验尚未完成；不扩大到 AI、账号或主题商城。原始 ~/Library/Rime 始终不作可写目标。
