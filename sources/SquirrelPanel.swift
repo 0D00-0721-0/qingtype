@@ -157,6 +157,10 @@ final class SquirrelPanel: NSPanel {
   // Main function to add attributes to text output from librime
   // swiftlint:disable:next cyclomatic_complexity function_parameter_count
   func update(preedit: String, selRange: NSRange, caretPos: Int, candidates: [String], comments: [String], labels: [String], highlighted index: Int, page: Int, lastPage: Bool, update: Bool) {
+    if !preedit.isEmpty, QingTypeInputSafety.markedRanges(in: preedit, selection: selRange, caret: caretPos) == nil {
+      hide()
+      return
+    }
     if update {
       self.preedit = preedit
       self.selRange = selRange
@@ -220,9 +224,9 @@ final class SquirrelPanel: NSPanel {
       let label = if theme.candidateFormat.contains(/\[label\]/) {
         if labels.count > 1 && i < labels.count {
           labels[i]
-        } else if labels.count == 1 && i < labels.first!.count {
+        } else if labels.count == 1, let first = labels.first, i < first.count {
           // custom: A. B. C...
-          String(labels.first![labels.first!.index(labels.first!.startIndex, offsetBy: i)])
+          String(first[first.index(first.startIndex, offsetBy: i)])
         } else {
           // default: 1. 2. 3...
           "\(i+1)"
@@ -232,7 +236,7 @@ final class SquirrelPanel: NSPanel {
       }
 
       let candidate = candidates[i].precomposedStringWithCanonicalMapping
-      let comment = comments[i].precomposedStringWithCanonicalMapping
+      let comment = i < comments.count ? comments[i].precomposedStringWithCanonicalMapping : ""
 
       let line = NSMutableAttributedString(string: theme.candidateFormat, attributes: labelAttrs)
       for range in line.string.ranges(of: /\[candidate\]/) {
@@ -250,7 +254,7 @@ final class SquirrelPanel: NSPanel {
       line.mutableString.replaceOccurrences(of: "[candidate]", with: candidate, range: NSRange(location: 0, length: line.length))
       line.mutableString.replaceOccurrences(of: "[comment]", with: comment, range: NSRange(location: 0, length: line.length))
 
-      if line.length <= 10 {
+      if line.length > 0 && line.length <= 10 {
         line.addAttribute(.noBreak, value: true, range: NSRange(location: 1, length: line.length-1))
       }
 
@@ -350,7 +354,11 @@ private extension SquirrelPanel {
   // SquirrelView.drawRect
   // swiftlint:disable:next cyclomatic_complexity
   func show() {
+    guard let contentView, let textContainer = view.textContainer,
+          view.textContentStorage != nil, QingTypeCandidatePlacement.isUsable(position) else { orderOut(nil); return }
     currentScreen()
+    guard screenRect.width.isFinite, screenRect.height.isFinite,
+          screenRect.width > 0, screenRect.height > 0 else { orderOut(nil); return }
     let theme = view.currentTheme
     if theme.native || view.darkTheme.available {
       self.appearance = NSApp.effectiveAppearance
@@ -362,7 +370,7 @@ private extension SquirrelPanel {
     // Break line if the text is too long, based on screen size.
     let textWidth = maxTextWidth()
     let maxTextHeight = vertical ? screenRect.width - theme.edgeInset.width * 2 : screenRect.height - theme.edgeInset.height * 2
-    view.textContainer.size = NSSize(width: textWidth, height: maxTextHeight)
+    textContainer.size = NSSize(width: textWidth, height: maxTextHeight)
 
     var panelRect = NSRect.zero
     // in vertical mode, the width and height are interchanged
@@ -373,7 +381,7 @@ private extension SquirrelPanel {
         maxHeight = contentRect.width
       } else {
         contentRect.size.width = maxHeight
-        view.textContainer.size = NSSize(width: maxHeight, height: maxTextHeight)
+        textContainer.size = NSSize(width: maxHeight, height: maxTextHeight)
       }
     }
 
@@ -423,23 +431,23 @@ private extension SquirrelPanel {
 
     // rotate the view, the core in vertical mode!
     if vertical {
-      contentView!.boundsRotation = -90
-      contentView!.setBoundsOrigin(NSPoint(x: 0, y: panelRect.width))
+      contentView.boundsRotation = -90
+      contentView.setBoundsOrigin(NSPoint(x: 0, y: panelRect.width))
     } else {
-      contentView!.boundsRotation = 0
-      contentView!.setBoundsOrigin(.zero)
+      contentView.boundsRotation = 0
+      contentView.setBoundsOrigin(.zero)
     }
     view.textView.boundsRotation = 0
     view.textView.setBoundsOrigin(.zero)
 
-    view.frame = contentView!.bounds
-    view.textView.frame = contentView!.bounds
+    view.frame = contentView.bounds
+    view.textView.frame = contentView.bounds
     view.textView.frame.size.width -= theme.pagingOffset
     view.textView.frame.origin.x += theme.pagingOffset
     view.textView.textContainerInset = theme.edgeInset
 
     if theme.translucency {
-      back.frame = contentView!.bounds
+      back.frame = contentView.bounds
       back.frame.size.width += theme.pagingOffset
       back.appearance = NSApp.effectiveAppearance
       back.isHidden = false
@@ -456,7 +464,8 @@ private extension SquirrelPanel {
     let theme = view.currentTheme
     let text = NSMutableAttributedString(string: message, attributes: theme.attrs)
     text.addAttribute(.paragraphStyle, value: theme.paragraphStyle, range: NSRange(location: 0, length: text.length))
-    view.textContentStorage.attributedString = text
+    guard let storage = view.textContentStorage else { hide(); return }
+    storage.attributedString = text
     view.textView.setLayoutOrientation(vertical ? .vertical : .horizontal)
     view.drawView(candidateRanges: [NSRange(location: 0, length: text.length)], hilightedIndex: -1,
                   preeditRange: .empty, highlightedPreeditRange: .empty, canPageUp: false, canPageDown: false)

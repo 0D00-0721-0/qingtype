@@ -22,6 +22,18 @@ enum QingTypeDiagnostics {
     let above = QingTypeCandidatePlacement.frame(size: size, caret: bottomCaret, screen: screen)
     expect(screen.contains(above) && above.minY == bottomCaret.maxY + 6, "bottom/right edge flips above and clamps on a negative-origin display")
     expect(!QingTypeCandidatePlacement.isUsable(.zero), "missing caret geometry cannot create a window at the screen origin")
+    let emptyLegacyView = SquirrelView(frame: .zero)
+    expect(emptyLegacyView.contentRect == .zero && emptyLegacyView.convert(range: NSRange(location: NSNotFound, length: 1)) == nil,
+           "empty legacy text layout and unknown ranges yield safe geometry")
+    let legacyPanel = SquirrelPanel(position: .zero)
+    legacyPanel.contentView = nil
+    legacyPanel.update(preedit: "", selRange: NSRange(location: 0, length: 0), caretPos: 0,
+                       candidates: ["你"], comments: [], labels: [], highlighted: 0, page: 0, lastPage: true, update: true)
+    expect(!legacyPanel.isVisible, "legacy panel safely skips drawing without a content view or usable position")
+    legacyPanel.update(preedit: "你", selRange: NSRange(location: NSNotFound, length: 1), caretPos: 0,
+                       candidates: ["你"], comments: [], labels: [], highlighted: 0, page: 0, lastPage: true, update: true)
+    expect(!legacyPanel.isVisible, "legacy panel rejects an invalid marked-text range")
+    legacyPanel.hide()
 
     var settings = QingTypeSettings()
     settings.pageSize = 7

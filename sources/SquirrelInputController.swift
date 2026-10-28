@@ -35,7 +35,8 @@ final class QingTypeInputController: IMKInputController {
 
   // swiftlint:disable:next cyclomatic_complexity
   override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
-    guard let event = event else { return false }
+    guard let event = event, let inputClient = sender as? IMKTextInput else { return false }
+    self.client = inputClient
     let modifiers = event.modifierFlags
     let changes = lastModifiers.symmetricDifference(modifiers)
 
@@ -52,7 +53,6 @@ final class QingTypeInputController: IMKInputController {
       }
     }
 
-    self.client = sender as? IMKTextInput
     if let app = client?.bundleIdentifier(), currentApp != app {
       currentApp = app
       updateAppOptions()
@@ -466,14 +466,20 @@ private extension QingTypeInputController {
     if rimeAPI.get_context(session, &ctx) {
       // update preedit text
       let preedit = ctx.composition.preedit.map({ String(cString: $0) }) ?? ""
-
-      let start = String.Index(preedit.utf8.index(preedit.utf8.startIndex, offsetBy: Int(ctx.composition.sel_start)), within: preedit) ?? preedit.startIndex
-      let end = String.Index(preedit.utf8.index(preedit.utf8.startIndex, offsetBy: Int(ctx.composition.sel_end)), within: preedit) ?? preedit.startIndex
-      let caretPos = String.Index(preedit.utf8.index(preedit.utf8.startIndex, offsetBy: Int(ctx.composition.cursor_pos)), within: preedit) ?? preedit.startIndex
+      let startOffset = Int(ctx.composition.sel_start)
+      let endOffset = Int(ctx.composition.sel_end)
+      let caretOffset = Int(ctx.composition.cursor_pos)
+      guard let ranges = QingTypeInputSafety.ranges(in: preedit, start: startOffset, end: endOffset, caret: caretOffset),
+            let end = QingTypeInputSafety.utf8Index(in: preedit, offset: endOffset),
+            let caretPos = QingTypeInputSafety.utf8Index(in: preedit, offset: caretOffset) else {
+        _ = rimeAPI.free_context(&ctx)
+        hidePalettes()
+        return
+      }
 
       if inlineCandidate {
         var candidatePreview = ctx.commit_text_preview.map { String(cString: $0) } ?? ""
-        let endOfCandidatePreview = candidatePreview.endIndex
+        let previewByteCount = candidatePreview.utf8.count
         if inlinePreedit {
           // 左移光標後的情形：
           // preedit:             ^已選某些字[xiang zuo yi dong]|guangbiao$
@@ -508,16 +514,17 @@ private extension QingTypeInputController {
         }
         // preedit can contain additional prompt text before start:
         // ^(prompt)[selection]$
-        let start = min(start, candidatePreview.endIndex)
+        let start = QingTypeInputSafety.utf8Index(in: candidatePreview, offset: min(startOffset, previewByteCount)) ?? candidatePreview.startIndex
         // caret can be either before or after the selected range.
-        let caretPos = caretPos <= start ? caretPos : endOfCandidatePreview
+        let previewCaretOffset = caretOffset <= startOffset ? caretOffset : previewByteCount
+        let previewCaret = QingTypeInputSafety.utf8Index(in: candidatePreview, offset: previewCaretOffset) ?? start
         show(preedit: candidatePreview,
              selRange: NSRange(location: start.utf16Offset(in: candidatePreview),
                                length: candidatePreview.utf16.distance(from: start, to: candidatePreview.endIndex)),
-             caretPos: caretPos.utf16Offset(in: candidatePreview))
+             caretPos: previewCaret.utf16Offset(in: candidatePreview))
       } else {
         if inlinePreedit {
-          show(preedit: preedit, selRange: NSRange(location: start.utf16Offset(in: preedit), length: preedit.utf16.distance(from: start, to: end)), caretPos: caretPos.utf16Offset(in: preedit))
+          show(preedit: preedit, selRange: ranges.selection, caretPos: ranges.caret)
         } else {
           // TRICKY: display a non-empty string to prevent iTerm2 from echoing
           // each character in preedit. note this is a full-shape space U+3000;
@@ -550,8 +557,7 @@ private extension QingTypeInputController {
       let page = Int(ctx.menu.page_no)
       let lastPage = ctx.menu.is_last_page
 
-      let selRange = NSRange(location: start.utf16Offset(in: preedit), length: preedit.utf16.distance(from: start, to: end))
-      showPanel(preedit: inlinePreedit ? "" : preedit, selRange: selRange, caretPos: caretPos.utf16Offset(in: preedit),
+      showPanel(preedit: inlinePreedit ? "" : preedit, selRange: ranges.selection, caretPos: ranges.caret,
                 candidates: candidates, comments: comments, labels: labels, highlighted: Int(ctx.menu.highlighted_candidate_index),
                 page: page, pageSize: Int(ctx.menu.page_size), lastPage: lastPage)
       _ = rimeAPI.free_context(&ctx)
@@ -570,6 +576,7 @@ private extension QingTypeInputController {
 
   func show(preedit: String, selRange: NSRange, caretPos: Int) {
     guard let client = client else { return }
+    guard let (convertedRange, remainingRange) = QingTypeInputSafety.markedRanges(in: preedit, selection: selRange, caret: caretPos) else { return }
     // print("[DEBUG] showPreeditString: '\(preedit)'")
     if self.preedit == preedit && self.caretPos == caretPos && self.selRange == selRange {
       return
@@ -580,14 +587,12 @@ private extension QingTypeInputController {
     self.selRange = selRange
 
     // print("[DEBUG] selRange.location = \(selRange.location), selRange.length = \(selRange.length); caretPos = \(caretPos)")
-    let start = selRange.location
     let attrString = NSMutableAttributedString(string: preedit)
-    if start > 0 {
-      let attrs = mark(forStyle: kTSMHiliteConvertedText, at: NSRange(location: 0, length: start))! as! [NSAttributedString.Key: Any]
-      attrString.setAttributes(attrs, range: NSRange(location: 0, length: start))
+    if convertedRange.length > 0 {
+      let attrs = QingTypeInputSafety.markAttributes(mark(forStyle: kTSMHiliteConvertedText, at: convertedRange))
+      attrString.setAttributes(attrs, range: convertedRange)
     }
-    let remainingRange = NSRange(location: start, length: preedit.utf16.count - start)
-    let attrs = mark(forStyle: kTSMHiliteSelectedRawText, at: remainingRange)! as! [NSAttributedString.Key: Any]
+    let attrs = QingTypeInputSafety.markAttributes(mark(forStyle: kTSMHiliteSelectedRawText, at: remainingRange))
     attrString.setAttributes(attrs, range: remainingRange)
     client.setMarkedText(attrString, selectionRange: NSRange(location: caretPos, length: 0), replacementRange: .empty)
   }

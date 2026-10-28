@@ -10,9 +10,10 @@ import AppKit
 private class SquirrelLayoutDelegate: NSObject, NSTextLayoutManagerDelegate {
   func textLayoutManager(_ textLayoutManager: NSTextLayoutManager, shouldBreakLineBefore location: any NSTextLocation, hyphenating: Bool) -> Bool {
     let index = textLayoutManager.offset(from: textLayoutManager.documentRange.location, to: location)
-    if let attributes = textLayoutManager.textContainer?.textView?.textContentStorage?.attributedString?.attributes(at: index, effectiveRange: nil),
-       let noBreak = attributes[.noBreak] as? Bool, noBreak {
-      return false
+    if let string = textLayoutManager.textContainer?.textView?.textContentStorage?.attributedString,
+       index >= 0, index < string.length {
+      let attributes = string.attributes(at: index, effectiveRange: nil)
+      if let noBreak = attributes[.noBreak] as? Bool, noBreak { return false }
     }
     return true
   }
@@ -42,14 +43,14 @@ final class SquirrelView: NSView {
   var currentTheme: SquirrelTheme {
     if isDark && darkTheme.available { darkTheme } else { lightTheme }
   }
-  var textLayoutManager: NSTextLayoutManager {
-    textView.textLayoutManager!
+  var textLayoutManager: NSTextLayoutManager? {
+    textView.textLayoutManager
   }
-  var textContentStorage: NSTextContentStorage {
-    textView.textContentStorage!
+  var textContentStorage: NSTextContentStorage? {
+    textView.textContentStorage
   }
-  var textContainer: NSTextContainer {
-    textLayoutManager.textContainer!
+  var textContainer: NSTextContainer? {
+    textLayoutManager?.textContainer
   }
 
   override init(frame frameRect: NSRect) {
@@ -60,7 +61,7 @@ final class SquirrelView: NSView {
     textView.isSelectable = false
     textView.textLayoutManager?.delegate = squirrelLayoutDelegate
     super.init(frame: frameRect)
-    textContainer.lineFragmentPadding = 0
+    textContainer?.lineFragmentPadding = 0
     self.wantsLayer = true
     self.layer?.masksToBounds = true
   }
@@ -76,7 +77,8 @@ final class SquirrelView: NSView {
   }
 
   func convert(range: NSRange) -> NSTextRange? {
-    guard range != .empty else { return nil }
+    guard range != .empty, range.location != NSNotFound, range.location >= 0, range.length >= 0,
+          let textLayoutManager else { return nil }
     guard let startLocation = textLayoutManager.location(textLayoutManager.documentRange.location, offsetBy: range.location) else { return nil }
     guard let endLocation = textLayoutManager.location(startLocation, offsetBy: range.length) else { return nil }
     return NSTextRange(location: startLocation, end: endLocation)
@@ -99,10 +101,12 @@ final class SquirrelView: NSView {
         y1 = max(rect.maxY, y1)
       }
     }
+    guard x0.isFinite, x1.isFinite, y0.isFinite, y1.isFinite else { return .zero }
     return NSRect(x: x0, y: y0, width: x1-x0, height: y1-y0)
   }
   // Get the rectangle containing the range of text, will first convert to glyph range, expensive to calculate
   func contentRect(range: NSTextRange) -> NSRect {
+    guard let textLayoutManager else { return .zero }
     // swiftlint:disable:next identifier_name
     var x0 = CGFloat.infinity, x1 = -CGFloat.infinity, y0 = CGFloat.infinity, y1 = -CGFloat.infinity
     textLayoutManager.enumerateTextSegments(in: range, type: .selection, options: [.rangeNotRequired]) { _, rect, _, _ in
@@ -112,6 +116,7 @@ final class SquirrelView: NSView {
       y1 = max(rect.maxY, y1)
       return true
     }
+    guard x0.isFinite, x1.isFinite, y0.isFinite, y1.isFinite else { return .zero }
     return NSRect(x: x0, y: y0, width: x1-x0, height: y1-y0)
   }
 
@@ -289,7 +294,9 @@ final class SquirrelView: NSView {
     }
     panelLayer.setAffineTransform(CGAffineTransform(translationX: theme.pagingOffset, y: 0))
     let panelPath = CGMutablePath()
-    panelPath.addPath(backgroundPath!, transform: panelLayer.affineTransform().scaledBy(x: 1, y: -1).translatedBy(x: 0, y: -dirtyRect.height))
+    if let backgroundPath {
+      panelPath.addPath(backgroundPath, transform: panelLayer.affineTransform().scaledBy(x: 1, y: -1).translatedBy(x: 0, y: -dirtyRect.height))
+    }
 
     let (pagingLayer, downPath, upPath) = pagingLayer(theme: theme, preeditRect: preeditRect)
     if let sublayers = pagingLayer.sublayers, !sublayers.isEmpty {
@@ -318,7 +325,7 @@ final class SquirrelView: NSView {
     if let upPath = self.upPath, upPath.contains(clickPoint) {
       return (nil, nil, true)
     }
-    if let path = shape.path, path.contains(clickPoint) {
+    if let path = shape.path, path.contains(clickPoint), let textLayoutManager {
       var point = NSPoint(x: clickPoint.x - textView.textContainerInset.width - currentTheme.pagingOffset,
                           y: clickPoint.y - textView.textContainerInset.height)
       let fragment = textLayoutManager.textLayoutFragment(for: point)
@@ -420,6 +427,7 @@ private extension SquirrelView {
   // Calculate 3 boxes containing the text in range. leadingRect and trailingRect are incomplete line rectangle
   // bodyRect is complete lines in the middle
   func multilineRects(forRange range: NSTextRange, extraSurounding: Double, bounds: NSRect) -> (NSRect, NSRect, NSRect) {
+    guard let textLayoutManager else { return (.zero, .zero, .zero) }
     let edgeInset = currentTheme.edgeInset
     var lineRects = [NSRect]()
     textLayoutManager.enumerateTextSegments(in: range, type: .selection, options: [.rangeNotRequired]) { _, rect, _, _ in
