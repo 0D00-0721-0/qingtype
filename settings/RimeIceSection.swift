@@ -18,8 +18,9 @@ extension SettingsModel {
   func installRimeIce(folder: URL? = nil, activate: Bool = false) {
     guard !busy, !loadFailed, inputReady else { return }
     guard !isDirty else { failed = true; message = "请先保存当前更改，再安装雾凇。"; return }
+    let hadInstalled = saved.rimeIce != nil
     busy = true; failed = false
-    message = folder == nil ? "正在下载并校验雾凇官方完整包…" : "正在校验雾凇完整方案…"
+    message = folder == nil ? "正在检查雾凇更新…" : "正在校验雾凇完整方案…"
     canCancelDownload = folder == nil; transferProgress = nil
     componentTask = Task {
       defer { busy = false; canCancelDownload = false; transferProgress = nil; componentTask = nil }
@@ -27,6 +28,15 @@ extension SettingsModel {
       defer { if let downloaded { try? FileManager.default.removeItem(at: downloaded.directory) } }
       do {
         if folder == nil {
+          // Compare the official archive checksum first: a repeat click after an
+          // update must not download and reinstall the same package again.
+          let release = try await QingTypeDownloads.release(repository: QingTypeRimeIceUpdates.repository, tag: "latest")
+          let update = try QingTypeRimeIceUpdates.inspect(release: release, installed: saved.rimeIce)
+          if update.upToDate {
+            message = "雾凇已是最新版本（\(update.installedVersion ?? "已安装")），无需下载。"
+            return
+          }
+          message = "正在下载并校验雾凇官方完整包…"
           downloaded = try await QingTypeRimeIceDownload.official { [self] progress in
             Task { @MainActor in if self.canCancelDownload { self.transferProgress = progress } }
           }
@@ -41,7 +51,9 @@ extension SettingsModel {
         saved = result.0
         settings = result.0
         deployment = result.1
-        message = activate ? "雾凇拼音已安装并启用。" : "雾凇已安装。选择“雾凇拼音”并保存应用即可使用。"
+        message = activate ? "雾凇拼音已安装并启用。"
+          : hadInstalled ? "雾凇已更新到 \(result.0.rimeIce?.version ?? "新版本")，选择“雾凇拼音”并保存应用即可使用。"
+          : "雾凇已安装。选择“雾凇拼音”并保存应用即可使用。"
       } catch {
         if Task.isCancelled || (error as? URLError)?.code == .cancelled { message = "已取消下载，当前输入设置保持不变。" }
         else { failed = true; message = error.localizedDescription }
@@ -63,7 +75,7 @@ struct RimeIceSection: View {
           .font(.callout).foregroundStyle(.secondary)
       }
       HStack {
-        Button(model.settings.rimeIce == nil ? "下载并安装官方方案" : "检查并安装官方更新") { model.installRimeIce() }
+        Button(model.settings.rimeIce == nil ? "下载并安装官方方案" : "检查雾凇更新") { model.installRimeIce() }
         Button("从方案文件夹导入…", action: model.chooseRimeIceFolder)
         Link("上游项目", destination: URL(string: "https://github.com/iDvel/rime-ice")!)
       }.disabled(model.busy || model.loadFailed || !model.inputReady)

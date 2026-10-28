@@ -68,6 +68,8 @@ enum DeploymentService {
       let report = try await QingTypeConfigurationApply.apply(updated, to: directory) {
         try await runWorker(appURL: inputMethodURL())
       }
+      _ = try? QingTypeBackupRetention.prune(in: directory.appendingPathComponent("backups"),
+                                             prefixes: ["rime-ice-"], keeping: 2)
       return (updated, report)
     } catch {
       let reason = error.localizedDescription

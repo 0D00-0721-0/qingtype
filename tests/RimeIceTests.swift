@@ -57,6 +57,37 @@ struct RimeIceTests {
     try expect(schema.contains("qingtype_ice_defaults:/punctuator") && schema.contains("import_preset: qingtype_ice_defaults"), "default references are namespaced")
     try expect(try asset.files.allSatisfy { try QingTypeContent.digest(of: user.appendingPathComponent($0.path)) == $0.sha256 }, "manifest hashes match installed bytes")
     try expect(QingTypeRimeIce.installed(in: user) == asset, "manifest round-trip")
+
+    // A repeat install must not rewrite unchanged bytes or leave staging dirs.
+    let stableFile = user.appendingPathComponent("cn_dicts/base.dict.yaml")
+    let sentinel = Date(timeIntervalSince1970: 1_000_000)
+    try manager.setAttributes([.modificationDate: sentinel], ofItemAtPath: stableFile.path)
+    _ = try QingTypeRimeIce.installPackage(from: source, into: user)
+    var afterStat = stat()
+    _ = stat(stableFile.path, &afterStat)
+    try expect(afterStat.st_mtimespec.tv_sec == Int(sentinel.timeIntervalSince1970),
+               "repeat install skips unchanged files")
+    try expect(try manager.contentsOfDirectory(atPath: user.path).filter { $0.hasPrefix(".ice-stage-") }.isEmpty,
+               "repeat install leaves no staging directory")
+
+    // The update check compares the official archive checksum before downloading.
+    let digestA = String(repeating: "a", count: 64)
+    let digestB = String(repeating: "b", count: 64)
+    func release(_ name: String, _ digest: String?) -> QingTypeRelease {
+      .init(tag_name: "nightly", assets: [.init(name: name,
+        browser_download_url: URL(string: "https://github.com/iDvel/rime-ice/releases/download/nightly/full.zip")!,
+        size: 1024, digest: digest.map { "sha256:" + $0 })])
+    }
+    var official = asset
+    official.archiveSHA256 = digestA
+    try expect(try QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: official).upToDate,
+               "matching archive checksum means up to date")
+    try expect(try !QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestB), installed: official).upToDate,
+               "a different archive checksum means an update")
+    try expect(try !QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: nil).upToDate,
+               "no installed package always needs an install")
+    try rejects({ _ = try QingTypeRimeIceUpdates.inspect(release: release("other.zip", digestA), installed: official) },
+                "missing official package asset")
     try expect(try String(contentsOf: user.appendingPathComponent("lua/lunar.db"), encoding: .utf8) == "static calendar fixture", "static lunar database is included without copying user-learning databases")
     settings.rimeIce = asset
     settings.schema = "rime_ice"
@@ -71,9 +102,10 @@ struct RimeIceTests {
     try manager.removeItem(at: user.appendingPathComponent("lua/date_translator.lua"))
     try rejects({ try settings.save(to: user) }, "missing installed dependency")
     try Data("return function() end".utf8).write(to: user.appendingPathComponent("lua/date_translator.lua"))
+    let manifestBeforeAgain = QingTypeRimeIce.installed(in: user)
     let again = try QingTypeRimeIce.installPackage(from: source, into: user)
     try QingTypeRimeIce.rollback(again, in: user)
-    try expect(QingTypeRimeIce.installed(in: user) == asset, "package rollback restores previous manifest")
+    try expect(QingTypeRimeIce.installed(in: user) == manifestBeforeAgain, "package rollback restores previous manifest")
     try write("lua/date_translator.lua", "return function() return 'new' end")
     let changed = try QingTypeRimeIce.installPackage(from: source, into: user)
     try expect(try String(contentsOf: user.appendingPathComponent("lua/date_translator.lua"), encoding: .utf8).contains("new"), "owned package files can update")

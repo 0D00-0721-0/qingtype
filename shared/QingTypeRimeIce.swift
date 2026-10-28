@@ -14,7 +14,10 @@ struct RimeIceAsset: Codable, Equatable {
 struct RimeIceInstallation {
   var asset: RimeIceAsset
   var backup: URL
+  /// Files that existed before this install and were overwritten.
   var replaced: Set<String>
+  /// Files this install created; only these may be removed by a rollback.
+  var created: Set<String>
   var previousManifest: Data?
 }
 
@@ -211,15 +214,22 @@ enum QingTypeRimeIce {
     try manager.createDirectory(at: backup, withIntermediateDirectories: true)
     let manifestURL = directory.appendingPathComponent(manifestName)
     let previousManifest = manager.fileExists(atPath: manifestURL.path) ? try Data(contentsOf: manifestURL) : nil
-    var replaced = Set<String>(), written: [String] = []
+    var replaced = Set<String>(), created = Set<String>(), written: [String] = []
     do {
       for file in files {
         let target = directory.appendingPathComponent(file.path)
+        // A repeat install must not rewrite bytes that already match: it keeps
+        // the backup small and avoids touching files the engine is not using.
+        if manager.fileExists(atPath: target.path), (try? QingTypeContent.digest(of: target)) == file.sha256 {
+          continue
+        }
         if manager.fileExists(atPath: target.path) {
           let saved = backup.appendingPathComponent(file.path)
           try manager.createDirectory(at: saved.deletingLastPathComponent(), withIntermediateDirectories: true)
           try manager.copyItem(at: target, to: saved)
           replaced.insert(file.path)
+        } else {
+          created.insert(file.path)
         }
         try manager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(contentsOf: stage.appendingPathComponent(file.path)).write(to: target, options: .atomic)
@@ -242,7 +252,8 @@ enum QingTypeRimeIce {
       }
       throw error
     }
-    return RimeIceInstallation(asset: asset, backup: backup, replaced: replaced, previousManifest: previousManifest)
+    return RimeIceInstallation(asset: asset, backup: backup, replaced: replaced, created: created,
+                               previousManifest: previousManifest)
   }
 
   // A failed activation restores package resources as well as generated settings.
@@ -257,7 +268,9 @@ enum QingTypeRimeIce {
       let target = try destination(file.path, in: directory)
       if installation.replaced.contains(file.path) {
         try Data(contentsOf: installation.backup.appendingPathComponent(file.path)).write(to: target, options: .atomic)
-      } else { try manager.removeItem(at: target) }
+      } else if installation.created.contains(file.path) {
+        try manager.removeItem(at: target)
+      }
     }
     let manifest = try destination(manifestName, in: directory)
     if let previous = installation.previousManifest { try previous.write(to: manifest, options: .atomic) }
