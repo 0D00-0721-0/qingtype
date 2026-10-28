@@ -74,6 +74,18 @@ struct MaintenanceRecoveryTests {
     try QingTypeBuildRecovery.restore(from: buildBackup, to: build)
     try expect(fm.fileExists(atPath: build.appendingPathComponent("qingtype_main.table.bin").path),
                "failed rebuild restores the previous artifacts")
+    var missingBackupError: Error?
+    do { try QingTypeBuildRecovery.restore(from: root.appendingPathComponent("missing-backup"), to: build) }
+    catch { missingBackupError = error }
+    try expect(missingBackupError != nil, "a missing recovery backup must not report success")
+    let foreignBackup = root.appendingPathComponent("foreign-backup")
+    try fm.createDirectory(at: foreignBackup, withIntermediateDirectories: true)
+    try Data("personal".utf8).write(to: foreignBackup.appendingPathComponent("notes.txt"))
+    var foreignBackupError: Error?
+    do { try QingTypeBuildRecovery.restore(from: foreignBackup, to: build) }
+    catch { foreignBackupError = error }
+    try expect(foreignBackupError != nil && fm.fileExists(atPath: foreignBackup.appendingPathComponent("notes.txt").path),
+               "unexpected backup content must be preserved and reported")
 
     let interrupted = root.appendingPathComponent("interrupted")
     let interruptedBackup = root.appendingPathComponent("interrupted-backup")

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Compiling can be interrupted by an earlier crash or a concurrent writer,
 /// leaving a truncated table or prism behind. Rime then refuses every later
@@ -54,20 +55,29 @@ enum QingTypeBuildRecovery {
 
   static func restore(from backup: URL, to buildDirectory: URL) throws {
     let manager = FileManager.default
-    guard let entries = try? manager.contentsOfDirectory(
-      at: backup, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey]) else { return }
+    let backupValues = try backup.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+    guard backupValues.isDirectory == true, backupValues.isSymbolicLink != true else {
+      throw SettingsError.invalid("编译文件备份不可用或包含链接：\(backup.path)")
+    }
+    let entries = try manager.contentsOfDirectory(at: backup, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+    guard !entries.isEmpty else { throw SettingsError.invalid("编译文件备份为空：\(backup.path)") }
+    for url in entries {
+      let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+      guard values.isRegularFile == true, values.isSymbolicLink != true,
+            ["bin", "yaml"].contains(url.pathExtension.lowercased()) else {
+        throw SettingsError.invalid("编译文件备份含有未识别的内容，已保留：\(backup.path)")
+      }
+    }
     try manager.createDirectory(at: buildDirectory, withIntermediateDirectories: true)
     for url in entries {
-      let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-      guard values?.isRegularFile == true, values?.isSymbolicLink != true else { continue }
       let target = buildDirectory.appendingPathComponent(url.lastPathComponent)
+      guard (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
+        throw SettingsError.invalid("恢复目标包含链接：\(target.lastPathComponent)")
+      }
       if manager.fileExists(atPath: target.path) { try manager.removeItem(at: target) }
       try manager.moveItem(at: url, to: target)
     }
-    try? manager.removeItem(at: backup)
-  }
-
-  static func discard(_ backup: URL) {
-    try? FileManager.default.removeItem(at: backup)
+    // Remove only an empty directory, never newly added or unrecognized files.
+    _ = rmdir(backup.path)
   }
 }

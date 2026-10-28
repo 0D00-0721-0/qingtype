@@ -135,7 +135,8 @@ enum DeploymentService {
       guard moved > 0 else { throw error }
       do {
         let report = try await executeWorker(appURL: appURL)
-        QingTypeBuildRecovery.discard(backup)
+        // Keep the old artifacts as a recoverable backup. Another process may
+        // have added files here, so do not recursively delete the directory.
         return report
       } catch {
         let reason = error.localizedDescription
