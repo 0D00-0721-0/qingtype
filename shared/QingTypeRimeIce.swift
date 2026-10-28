@@ -60,6 +60,26 @@ enum QingTypeRimeIce {
     return asset
   }
 
+  static func verifyInstalled(_ asset: RimeIceAsset, in directory: URL) throws {
+    try QingTypePaths.checkDirectory(directory)
+    try validate(asset)
+    let manifest = try destination(manifestName, in: directory)
+    let values = try manifest.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+    guard values.isRegularFile == true, values.isSymbolicLink != true,
+          try JSONDecoder().decode(RimeIceAsset.self, from: Data(contentsOf: manifest)) == asset else {
+      throw SettingsError.invalid("雾凇清单与当前设置不一致，请先备份并检查方案文件。")
+    }
+    for file in asset.files {
+      try Task.checkCancellation()
+      let path = try destination(file.path, in: directory)
+      guard let attributes = try? path.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+            attributes.isRegularFile == true, attributes.isSymbolicLink != true,
+            try QingTypeContent.digest(of: path, checkingCancellation: true) == file.sha256 else {
+        throw SettingsError.invalid("雾凇资源缺失或已修改：\(file.path)。原文件已保留，请先备份并检查后重新安装。")
+      }
+    }
+  }
+
   private static func destination(_ name: String, in directory: URL) throws -> URL {
     guard safePath(name) else { throw SettingsError.invalid("不安全的资源目标路径。") }
     var path = directory

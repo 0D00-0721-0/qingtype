@@ -80,14 +80,32 @@ struct RimeIceTests {
     }
     var official = asset
     official.archiveSHA256 = digestA
-    try expect(try QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: official).upToDate,
+    let manifestURL = user.appendingPathComponent(QingTypeRimeIce.manifestName)
+    let originalManifest = try Data(contentsOf: manifestURL)
+    try JSONEncoder().encode(official).write(to: manifestURL)
+    try expect(try QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: official, directory: user).upToDate,
                "matching archive checksum means up to date")
-    try expect(try !QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestB), installed: official).upToDate,
+    try expect(try !QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestB), installed: official, directory: user).upToDate,
                "a different archive checksum means an update")
-    try expect(try !QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: nil).upToDate,
+    try expect(try !QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: nil, directory: user).upToDate,
                "no installed package always needs an install")
-    try rejects({ _ = try QingTypeRimeIceUpdates.inspect(release: release("other.zip", digestA), installed: official) },
+    try rejects({ _ = try QingTypeRimeIceUpdates.inspect(release: release("other.zip", digestA), installed: official, directory: user) },
                 "missing official package asset")
+    let integrityFile = user.appendingPathComponent("lua/date_translator.lua")
+    let originalFile = try Data(contentsOf: integrityFile)
+    try manager.removeItem(at: integrityFile)
+    try rejects({ _ = try QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: official, directory: user) }, "missing resource must not be called up to date")
+    try Data("modified".utf8).write(to: integrityFile)
+    try rejects({ _ = try QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: official, directory: user) }, "modified resource must not be called up to date")
+    try expect(try Data(contentsOf: integrityFile) == Data("modified".utf8), "integrity check preserves modified resource")
+    try originalFile.write(to: integrityFile)
+    try manager.removeItem(at: integrityFile)
+    try manager.createSymbolicLink(at: integrityFile, withDestinationURL: root.appendingPathComponent("external-resource"))
+    try rejects({ _ = try QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: official, directory: user) }, "linked resource must not be called up to date")
+    try manager.removeItem(at: integrityFile)
+    try originalFile.write(to: integrityFile)
+    try originalManifest.write(to: manifestURL)
+    try rejects({ _ = try QingTypeRimeIceUpdates.inspect(release: release("full.zip", digestA), installed: official, directory: user) }, "manifest mismatch must not be called up to date")
     try expect(try String(contentsOf: user.appendingPathComponent("lua/lunar.db"), encoding: .utf8) == "static calendar fixture", "static lunar database is included without copying user-learning databases")
     settings.rimeIce = asset
     settings.schema = "rime_ice"

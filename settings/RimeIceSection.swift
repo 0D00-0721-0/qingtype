@@ -31,7 +31,11 @@ extension SettingsModel {
           // Compare the official archive checksum first: a repeat click after an
           // update must not download and reinstall the same package again.
           let release = try await QingTypeDownloads.release(repository: QingTypeRimeIceUpdates.repository, tag: "latest")
-          let update = try QingTypeRimeIceUpdates.inspect(release: release, installed: saved.rimeIce)
+          let installed = saved.rimeIce
+          let check = Task.detached(priority: .utility) {
+            try QingTypeRimeIceUpdates.inspect(release: release, installed: installed, directory: QingTypePaths.userDirectory)
+          }
+          let update = try await withTaskCancellationHandler(operation: { try await check.value }, onCancel: { check.cancel() })
           if update.upToDate {
             message = "雾凇已是最新版本（\(update.installedVersion ?? "已安装")），无需下载。"
             return
