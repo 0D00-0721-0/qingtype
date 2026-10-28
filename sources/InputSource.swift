@@ -14,9 +14,8 @@ final class SquirrelInstaller {
     case hans = "org.qingtype.inputmethod.QingType.Hans"
     case hant = "org.qingtype.inputmethod.QingType.Hant"
   }
-  private lazy var inputSources: [String: TISInputSource] = {
+  private var inputSources: [String: TISInputSource] {
     var inputSources = [String: TISInputSource]()
-    var matchingSources = [InputMode: TISInputSource]()
     let sourceList = TISCreateInputSourceList(nil, true).takeRetainedValue() as! [TISInputSource]
     for inputSource in sourceList {
       let sourceIDRef = TISGetInputSourceProperty(inputSource, kTISPropertyInputSourceID)
@@ -25,7 +24,7 @@ final class SquirrelInstaller {
       inputSources[sourceID] = inputSource
     }
     return inputSources
-  }()
+  }
 
   func enabledModes() -> [InputMode] {
     var enabledModes = Set<InputMode>()
@@ -91,10 +90,14 @@ final class SquirrelInstaller {
       if let enabled = getBool(for: inputSource, key: kTISPropertyInputSourceIsEnabled),
          let selectable = getBool(for: inputSource, key: kTISPropertyInputSourceIsSelectCapable),
          let selected = getBool(for: inputSource, key: kTISPropertyInputSourceIsSelected),
-         enabled && selectable && !selected {
-        let error = TISSelectInputSource(inputSource)
-        print("Selection \(error == noErr ? "succeeds" : "fails") (OSStatus \(error)) for input source: \(mode.rawValue)")
-        if error != noErr { exit(1) }
+         enabled && selectable {
+        if selected {
+          print("Input source already selected: \(mode.rawValue)")
+        } else {
+          let error = TISSelectInputSource(inputSource)
+          print("Selection \(error == noErr ? "succeeds" : "fails") (OSStatus \(error)) for input source: \(mode.rawValue)")
+          if error != noErr { exit(1) }
+        }
       } else {
         print("Failed to select \(mode.rawValue)")
       }

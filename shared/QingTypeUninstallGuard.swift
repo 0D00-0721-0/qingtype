@@ -34,12 +34,30 @@ enum QingTypeUninstallGuard {
     }
   }
 
+  static func verifyRestored(_ state: QingTypeUninstallSnapshot, enabled: Set<String>, selected: String?) throws {
+    let enabledModes = Set(state.modes.filter { $0.registered && $0.enabled }.map(\.id))
+    let selectedModes = Set(state.modes.filter(\.selected).map(\.id))
+    guard enabledModes == enabled,
+          enabled.isEmpty || state.parentEnabled == true,
+          selectedModes == (selected.map { Set([$0]) } ?? []),
+          let current = state.current,
+          selected.map({ current == $0 }) ?? !current.hasPrefix(prefix) else {
+      throw SettingsError.invalid("系统未确认恢复原输入源；请在系统键盘设置中检查并重新添加清言。")
+    }
+  }
+
   static func prepare(read: () throws -> QingTypeUninstallSnapshot,
                       selectFallback: () throws -> Void,
                       disable: () throws -> Void,
                       restore: (QingTypeUninstallSnapshot) throws -> Void) throws -> QingTypeUninstallSnapshot {
     let previous = try read()
     guard let current = previous.current else { throw SettingsError.invalid("无法确认当前输入源，已停止卸载。") }
+    // Disabling the parent cannot currently be reversed reliably on all macOS
+    // versions. Do not disturb an active source when verification will fail.
+    guard previous.parentEnabled == false ||
+          (previous.parentEnabled == nil && previous.modes.allSatisfy({ !$0.registered })) else {
+      throw SettingsError.invalid("无法安全确认并恢复清言父输入源，已停止卸载，输入源和程序未更改。")
+    }
     var changed = false
     do {
       if current.hasPrefix(prefix) || previous.modes.contains(where: \.selected) {

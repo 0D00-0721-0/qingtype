@@ -9,10 +9,12 @@ final class FakeUninstallSources {
   var failDisable = false
   var silentDisable = false
   var failRestore = false
+  var parentEnabled = false
   var fallbackCalls = 0
+  var disableCalls = 0
 
   func read() throws -> QingTypeUninstallSnapshot {
-    .init(current: current, modes: [hans, hant].map { .init(id: $0, registered: true, enabled: enabled.contains($0), selected: current == $0) }, parentEnabled: false)
+    .init(current: current, modes: [hans, hant].map { .init(id: $0, registered: true, enabled: enabled.contains($0), selected: current == $0) }, parentEnabled: parentEnabled)
   }
   func fallback() throws {
     fallbackCalls += 1
@@ -20,6 +22,7 @@ final class FakeUninstallSources {
     current = "com.apple.keylayout.ABC"
   }
   func disable() throws {
+    disableCalls += 1
     if failDisable { enabled.remove(hans); throw SettingsError.invalid("disable failed") }
     if !silentDisable { enabled.removeAll() }
   }
@@ -58,6 +61,9 @@ struct UninstallSafetyTests {
     let active = FakeUninstallSources(); active.enabled = [active.hans]; active.current = active.hans
     _ = try active.prepare()
     try expect(active.current == "com.apple.keylayout.ABC" && active.enabled.isEmpty && active.fallbackCalls == 1, "current source must switch before disable")
+    let liveParent = FakeUninstallSources(); liveParent.parentEnabled = true; liveParent.enabled = [liveParent.hans]; liveParent.current = liveParent.hans
+    _ = try expectFailure({ _ = try liveParent.prepare() }, "enabled parent cannot yet be safely deactivated and restored")
+    try expect(liveParent.fallbackCalls == 0 && liveParent.disableCalls == 0 && liveParent.current == liveParent.hans && liveParent.enabled == [liveParent.hans], "unsupported parent must fail before changing the active source")
     let parentDisabled = QingTypeUninstallSnapshot(current: "com.apple.keylayout.ABC", modes: [
       .init(id: active.hans, registered: true, enabled: true, selected: false)
     ], parentEnabled: false)
@@ -79,6 +85,17 @@ struct UninstallSafetyTests {
       .init(id: active.hans, registered: true, enabled: true, selected: true)
     ], parentEnabled: false)
     _ = try expectFailure({ try QingTypeUninstallGuard.verify(inconsistentSelection) }, "selected mode despite disabled parent")
+    let restored = QingTypeUninstallSnapshot(current: active.hans, modes: [
+      .init(id: active.hans, registered: true, enabled: true, selected: true),
+      .init(id: active.hant, registered: true, enabled: false, selected: false)
+    ], parentEnabled: true)
+    try QingTypeUninstallGuard.verifyRestored(restored, enabled: [active.hans], selected: active.hans)
+    var silentParentFailure = restored; silentParentFailure.parentEnabled = false
+    _ = try expectFailure({ try QingTypeUninstallGuard.verifyRestored(silentParentFailure, enabled: [active.hans], selected: active.hans) }, "parent silently disabled")
+    var silentSelectionFailure = restored; silentSelectionFailure.current = "com.apple.keylayout.ABC"
+    _ = try expectFailure({ try QingTypeUninstallGuard.verifyRestored(silentSelectionFailure, enabled: [active.hans], selected: active.hans) }, "current source differs from selected flag")
+    var silentEnableFailure = restored; silentEnableFailure.modes[0].enabled = false
+    _ = try expectFailure({ try QingTypeUninstallGuard.verifyRestored(silentEnableFailure, enabled: [active.hans], selected: active.hans) }, "mode silently disabled")
     let noFallback = FakeUninstallSources(); noFallback.enabled = [noFallback.hans]; noFallback.current = noFallback.hans; noFallback.hasFallback = false
     _ = try expectFailure({ _ = try noFallback.prepare() }, "no fallback")
     try expect(noFallback.fallbackCalls == 1 && noFallback.current == noFallback.hans && noFallback.enabled == [noFallback.hans], "no fallback keeps source")
@@ -98,7 +115,7 @@ struct UninstallSafetyTests {
     let selectionError = try expectFailure({
       _ = try QingTypeUninstallGuard.prepare(read: {
         reads += 1
-        return .init(current: "com.apple.keylayout.ABC", modes: [.init(id: inactive.hans, registered: true, enabled: true, selected: reads > 1)])
+        return .init(current: "com.apple.keylayout.ABC", modes: [.init(id: inactive.hans, registered: true, enabled: true, selected: reads > 1)], parentEnabled: false)
       }, selectFallback: {}, disable: { throw SettingsError.invalid("disable failed") }, restore: { _ in })
     }, "selection recovery")
     try expect(selectionError.localizedDescription.contains("恢复未确认"), "selection mismatch must not be reported as recovered")

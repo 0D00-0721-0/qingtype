@@ -124,9 +124,17 @@ struct SquirrelApp {
           return true
         case "--restore-uninstall-source":
           guard args.count >= 3 else { exit(1) }
-          let modes = args[2].split(separator: ",").compactMap { SquirrelInstaller.InputMode(rawValue: String($0)) }
-          if !modes.isEmpty { installer.enable(modes: modes) }
-          if args.count > 3, let mode = SquirrelInstaller.InputMode(rawValue: args[3]), modes.contains(mode) { installer.select(mode: mode) }
+          do {
+            let ids = args[2].split(separator: ",").map(String.init)
+            let valid = Set(SquirrelInstaller.InputMode.allCases.map(\.rawValue))
+            try QingTypeUninstallGuard.validateModeIDs(ids, valid: valid)
+            let selected = args.count > 3 && !args[3].isEmpty ? args[3] : nil
+            if let selected, !ids.contains(selected) { throw SettingsError.invalid("原选中输入源不在恢复列表中。") }
+            let modes = ids.compactMap(SquirrelInstaller.InputMode.init(rawValue:))
+            if !modes.isEmpty { installer.enable(modes: modes) }
+            if let selected, let mode = SquirrelInstaller.InputMode(rawValue: selected) { installer.select(mode: mode) }
+            try QingTypeUninstallGuard.verifyRestored(installer.uninstallSnapshot(), enabled: Set(ids), selected: selected)
+          } catch { fputs("\(error.localizedDescription)\n", stderr); exit(1) }
           return true
         case "--status":
           let report: [String: Any] = [
