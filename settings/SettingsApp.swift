@@ -72,7 +72,8 @@ final class SettingsModel: ObservableObject {
     Task.detached {
       var states: [String: QingTypeModelFileState] = [:]
       for model in models { states[model.id] = QingTypeContent.modelFileState(model, in: directory) }
-      await MainActor.run { self.modelFileStates = states }
+      let result = states
+      await MainActor.run { self.modelFileStates = result }
     }
   }
   var inputReady: Bool {
