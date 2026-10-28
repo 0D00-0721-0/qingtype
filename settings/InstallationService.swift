@@ -37,7 +37,9 @@ enum InstallationService {
         throw SettingsError.invalid("已安装的输入法 \(status.installedVersion ?? "未知版本") 比此安装包 \(status.payloadVersion ?? "未知版本") 更新，未做任何更改。")
       case .deployOnly:
         return try await redeploy(status: status)
-      case .install, .update, .repair, .reinstall:
+      case .reinstall:
+        throw SettingsError.invalid("输入法与安装包版本相同但构建内容不同，请确认后选择重新安装。")
+      case .install, .update, .repair:
         break
       }
     }

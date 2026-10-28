@@ -50,6 +50,19 @@ struct InstallationStatusTests {
     try expect(QingTypeInstallationCheck.action(for: status) == .deployOnly, "equal versions must only redeploy")
     try expect(status.installedVersion == "0.6.4" && status.payloadVersion == "0.6.4", "versions must be reported")
 
+    let installedBinary = destination.appendingPathComponent("Contents/MacOS/QingType")
+    try Data("different build".utf8).write(to: installedBinary)
+    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: installedBinary.path)
+    status = QingTypeInstallationCheck.inspect(destination: destination, payload: payload)
+    try expect(status.state == .installedDifferentBuild, "equal versions with different executable bytes must not be treated as identical")
+    try expect(QingTypeInstallationCheck.action(for: status) == .reinstall, "same-version build differences require explicit reinstall")
+    try Data("binary".utf8).write(to: installedBinary)
+    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: installedBinary.path)
+    try Data("different resource".utf8).write(to: destination.appendingPathComponent("Contents/SharedSupport/luna_pinyin.dict.yaml"))
+    status = QingTypeInstallationCheck.inspect(destination: destination, payload: payload)
+    try expect(status.state == .installedDifferentBuild, "equal versions with a different resource must not be treated as identical")
+    try Data("dict".utf8).write(to: destination.appendingPathComponent("Contents/SharedSupport/luna_pinyin.dict.yaml"))
+
     // Installed older than the payload.
     try writeApp(destination, version: "0.6.3")
     status = QingTypeInstallationCheck.inspect(destination: destination, payload: payload)

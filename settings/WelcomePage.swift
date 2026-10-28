@@ -169,6 +169,9 @@ struct WelcomePage: View {
               } else if model.installAction == .blockedNewer {
                 Label("已安装较新版本 \(model.installedVersion ?? "")", systemImage: "checkmark.circle.fill")
                   .font(.callout).foregroundStyle(.secondary)
+              } else if model.installAction == .reinstall {
+                Button("重新安装…") { confirmReinstall = true }
+                  .buttonStyle(.borderedProminent).disabled(model.busy || model.loadFailed)
               } else {
                 Button(model.installTitle, action: model.installInputMethod).buttonStyle(.borderedProminent)
                   .disabled(model.busy || model.loadFailed || model.installAction == .blockedNewer)
@@ -178,6 +181,10 @@ struct WelcomePage: View {
             if let version = model.installedVersion, model.installAction != .deployOnly {
               Text("已安装 \(version)").font(.caption).foregroundStyle(.secondary)
             }
+          }
+          if model.installAction == .reinstall {
+            Text("已安装程序与安装包版本相同，但内容不同。请确认后重新安装。")
+              .font(.caption).foregroundStyle(.secondary)
           }
           if model.inputReady { Button("切换到清言", action: model.selectQingType).disabled(model.busy) }
         }.frame(maxWidth: .infinity, alignment: .leading).padding(10)

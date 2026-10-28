@@ -5,6 +5,7 @@ import Foundation
 enum QingTypeInstallationState: String, Equatable {
   case notInstalled
   case installedSameVersion
+  case installedDifferentBuild
   case installedOlderVersion
   case installedNewerVersion
   case corrupted
@@ -38,6 +39,32 @@ enum QingTypeInstallationCheck {
     "Contents/Frameworks/librime.1.dylib",
     "Contents/SharedSupport/luna_pinyin.dict.yaml",
   ]
+
+  private static func bundleEntries(_ app: URL) throws -> [String: String] {
+    var enumerationError: Error?
+    guard let iterator = FileManager.default.enumerator(at: app, includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey], errorHandler: { _, error in
+      enumerationError = error
+      return false
+    }) else { throw SettingsError.invalid("无法读取输入法程序。") }
+    let base = app.standardizedFileURL.pathComponents
+    var entries: [String: String] = [:]
+    for case let item as URL in iterator {
+      let components = item.standardizedFileURL.pathComponents
+      guard components.starts(with: base) else { throw SettingsError.invalid("输入法程序路径越界。") }
+      let relative = components.dropFirst(base.count).joined(separator: "/")
+      let values = try item.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey])
+      if values.isSymbolicLink == true {
+        entries[relative] = "link:" + (try FileManager.default.destinationOfSymbolicLink(atPath: item.path))
+      } else if values.isDirectory == true { entries[relative] = "directory" }
+      else if values.isRegularFile == true {
+        let attributes = try FileManager.default.attributesOfItem(atPath: item.path)
+        let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0
+        entries[relative] = "\(permissions):" + (try QingTypeContent.digest(of: item))
+      } else { throw SettingsError.invalid("输入法程序含有不支持的文件。") }
+    }
+    if let enumerationError { throw enumerationError }
+    return entries
+  }
 
   static func inspect(destination: URL, payload: URL?,
                       signature: ((URL) throws -> Void)? = nil) -> QingTypeInstallationStatus {
@@ -78,9 +105,11 @@ enum QingTypeInstallationCheck {
                    problems: problems, leftoverStaging: leftover)
     }
     let order = expected.compare(installed, options: .numeric)
-    let state: QingTypeInstallationState = order == .orderedSame ? .installedSameVersion
-      : order == .orderedDescending ? .installedOlderVersion
-      : .installedNewerVersion
+    let state: QingTypeInstallationState
+    if order == .orderedSame, let payload {
+      do { state = try bundleEntries(destination) == bundleEntries(payload) ? .installedSameVersion : .installedDifferentBuild }
+      catch { state = .installedDifferentBuild; problems.append("无法确认同版本输入法内容一致：\(error.localizedDescription)") }
+    } else { state = order == .orderedDescending ? .installedOlderVersion : .installedNewerVersion }
     return .init(state: state, installedVersion: installed, payloadVersion: expected,
                  problems: problems, leftoverStaging: leftover)
   }
@@ -89,6 +118,7 @@ enum QingTypeInstallationCheck {
     switch status.state {
     case .notInstalled: return .install
     case .installedSameVersion: return .deployOnly
+    case .installedDifferentBuild: return .reinstall
     case .installedOlderVersion: return .update
     case .installedNewerVersion: return .blockedNewer
     case .corrupted: return .repair
