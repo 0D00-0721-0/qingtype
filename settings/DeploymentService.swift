@@ -1,6 +1,32 @@
 import AppKit
 
 enum DeploymentService {
+  /// Stops the running input service so an exclusive deployment can take the
+  /// data lock. Enabling an input source can make macOS launch the service
+  /// again, so callers stop it immediately before each deployment.
+  @discardableResult
+  static func stopInputMethod(bundleIdentifier: String = "org.qingtype.inputmethod.QingType") async throws -> Bool {
+    let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
+    guard !running.isEmpty else { return false }
+    for app in running { app.terminate() }
+    for _ in 0..<40 {
+      if running.allSatisfy(\.isTerminated) { break }
+      try await Task.sleep(nanoseconds: 100_000_000)
+    }
+    guard running.allSatisfy(\.isTerminated) else {
+      throw SettingsError.invalid("输入法尚未退出，请结束当前输入后重新应用。")
+    }
+    return true
+  }
+
+  /// Starts the installed input service in the background. Failure is not fatal:
+  /// macOS starts the service on demand and the install has already committed.
+  static func startInputMethod(at url: URL) {
+    let config = NSWorkspace.OpenConfiguration()
+    config.activates = false
+    NSWorkspace.shared.openApplication(at: url, configuration: config, completionHandler: nil)
+  }
+
   static func inputMethodURL() -> URL {
     let own = Bundle.main.bundleURL
     let nestedParent = own.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

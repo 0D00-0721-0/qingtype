@@ -2,6 +2,17 @@
 
 更新时间：2026-10-28（Asia/Shanghai）。目标/边界见 AGENTS.md，验收标准见 ROADMAP.md。
 
+## 0.6.3 升级失败与 0.6.4 修复（2026-10-28）
+
+- 用户从 0.6.2 通过 GUI 自更新到 0.6.3 时失败，报「安装失败，程序已恢复，但输入源或缓存恢复未确认」「配置已恢复，但恢复后的编译未通过」「部署失败：清言正在输入或管理数据」。原因：安装流程启用输入源后 macOS 立即拉起输入服务，服务持有共享数据锁 `~/Library/QingType/.qingtype-data.lock`；随后部署 worker（`--deploy-user-data`，独占锁）必然失败。回滚又把新程序换入临时目录并删除，运行中的服务于是继续指向已删除的 `.qingtype-stage-*`。缓存恢复失败只涉及各应用自己的输入源缓存，系统会重建。
+- 现场恢复（未动词库、学习数据、设置）：退出设置进程并停止该孤儿服务后，用已安装的 0.6.3 执行 `--deploy-user-data` 成功（「词库已编译，输入方案检查通过」），从正式路径重启服务；用户确认中文输入正常。
+- 代码修复：新增 `DeploymentService.stopInputMethod` / `startInputMethod`；`InstallationService.activate` 在每次部署前停止服务、部署成功后从正式安装路径重启；回滚分支与无安装源分支先停服务，避免在事务会删除的目录中留下运行进程。VERSION 升至 0.6.4。
+- 第二次失败（首轮修复后）：用户点「重新检查并启用」重装 0.6.4 时，部署报 `dictionary 'qingtype_main' failed to compile`，并把 `~/Library/QingType/build/qingtype_main.table.bin` 写成 3,508 字节残片（原为 13,041,144 字节），此后每次部署都失败。原因是首轮修复后部署紧跟在「启用输入源」之后，macOS 拉起的服务与部署 worker 同时编译同一个 `build/` 目录。处置：删除被写坏的 `qingtype_main.table.bin` / `reverse.bin` / `qingtype_luna_pinyin_simp.prism.bin` 后重新部署，13MB 词表重建成功、部署通过。
+- 顺序修复：`QingTypeInstallationSession` 拆出 `backUpCache` 与 `enableInputSource`；安装改为「备份缓存 → 停服务 → 部署 → 注册并启用输入源 → 从正式路径启动服务」。部署期间不再有服务并发编译。仍保留每次部署前的停止调用，作为回滚重试时的保护。
+- 验证：本机 0.6.4 干净构建；以雾凇夹具必需模式跑完整 `scripts/test.sh` 173 项 PASS、0 失败；DMG 打包与 `DistributionTests.py` 通过。真实升级：构造与 GUI 自更新相同的待完成更新清单，在输入服务保持运行的情况下完成 0.6.3 → 0.6.4 安装（约 7 秒）；安装目录版本 0.6.4、服务从正式路径启动、无 `.qingtype-stage-*` 残留、部署 `success: true` 且模型已验证加载。顺序修复后再次走同一路径重装：约 5 秒完成，`qingtype_main.table.bin` 保持 13,041,144 字节，最新部署日志无错误。
+- 该失败路径此前从未真实执行过（0.6.3 是首次实际 GUI 自更新），已发布的 0.6.3 包仍含此问题；0.6.4 针对该修复，发布前待用户确认真实键盘输入。
+- 未实现：编译产物损坏后应用不会自动清除并重建，用户需手动删除 `~/Library/QingType/build` 中对应文件或重建；这条修复只消除已知的并发写入原因，不能证明其他原因造成的损坏会自动恢复。
+
 ## 0.6.3 预览发布（2026-10-28）
 
 - 版本提交 `a0a5537`（VERSION 0.6.3）与文档提交 `8eac967`（README/INSTALLATION/RELEASE_NOTES 说明 0.6.3 及卸载限制）已推送到 `origin/main`。
@@ -117,8 +128,8 @@
 
 ## 当前版本与支持范围
 
-本机已安装 **0.6.2 开发修复版**；最新公开预览为 **0.6.3**；仅支持 M 芯片 Mac，macOS 14+。
-新发布 [v0.6.3-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.3-preview.1)，tag 指向 8eac967d8e571dd81a9e15dc562df014cf55b0d5，DMG SHA-256 20eba9ef059da565869c4c2d7c6fefccc7bf4e96a1cc6c7a12039418816d1ec7。
+本机已安装 **0.6.4 本地构建**（修复 0.6.3 升级失败，尚未发布）；最新公开预览为 **0.6.3**；仅支持 M 芯片 Mac，macOS 14+。
+公开 [v0.6.3-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.3-preview.1)，tag 指向 8eac967d8e571dd81a9e15dc562df014cf55b0d5，DMG SHA-256 20eba9ef059da565869c4c2d7c6fefccc7bf4e96a1cc6c7a12039418816d1ec7；该包升级输入法时的失败原因与修复见上一节。
 上一版 [v0.6.2-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.2-preview.1)，tag 为 0c3f156f2c44ce1b53374b72ff1f1149e51f3404。用户明确不再开发/验收 Intel，此约束已写入 AGENTS.md、构建入口和 CI。
 历史基线 [v0.6.1-preview.1](https://github.com/0D00-0721-0/qingtype/releases/tag/v0.6.1-preview.1)，非草稿、预览版。tag 指向 fffae68ec5b6c99d864ef4033865f8603d2b39c2；main 后继 e638a42 只改测试镜像清理和进度记录，未移动 tag。
 
@@ -157,7 +168,7 @@
 
 0. 先解决实际卸载时 macOS TIS 停用状态不一致，以及停用父输入源后无法通过 API 可靠恢复的问题；不得在未确认恢复的情况下再次强制停用。本机输入服务与设置应用仍是 0.6.2 开发构建；最新卸载保护已随源码发布，但自动卸载仍不可用。
 1. 个人词库编辑/删除/批量导入、重启后的真人结果仍需逐项记录；不能把新建+重新应用保留当作全部 Phase 1 人工验收。
-2. 0.6.3 公开包已发布，可作为下一次 GUI 自更新的目标版本（本机 0.6.2 → 0.6.3）；自更新程序事务已隔离验证，正常安装器和生产程序替换真实运行过，但完整 GUI 自更新仍未执行。干净/可恢复 Mac 仍需安装→输入→升级→卸载→数据保留图形验收，本机未为测试实际卸载。
+2. GUI 自更新的安装、部署阶段已在 0.6.3 → 0.6.4 真实升级中执行（手工构造待完成清单、服务保持运行，未走应用内下载），并通过；0.6.4 发布后仍需完整走一次「检查→下载→校验→替换→完成更新」的真实 GUI 流程。干净/可恢复 Mac 仍需安装→输入→升级→卸载→数据保留图形验收，本机未为测试实际卸载。
 3. 继续 docs/COMPATIBILITY.md 中其他应用、数字/翻页/编辑组合、真实多屏/缩放/全屏/休眠和长时间使用，按控件记录，不用内部检查替代真实输入。
 4. 有效签名身份仍为 0：临时签名、未公证预览可从 GitHub 下载；Developer ID、公证与默认系统信任需真实证书。完整运行库源码重建/分发溯源审计仍有记录限制。
 5. Phase 1–6 已有实现及自动化覆盖；仍须完成真实故障回滚、卸载、输入与模型降级验收。Phase 7 矩阵基础设施已建立，真实应用和环境验收待继续；Phase 8 App Store 最小实验尚未完成；不扩大到 AI、账号或主题商城。原始 ~/Library/Rime 始终不作可写目标。

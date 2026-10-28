@@ -5,7 +5,7 @@
 
 [GitHub 预览版下载](https://github.com/0D00-0721-0/qingtype/releases)。下载 Assets 中的 DMG，另附 SHA-256 文件。
 
-1. 打开 `QingType-0.6.3-arm64.dmg`，将「清言.app」拖入「Applications」。
+1. 打开 `QingType-0.6.4-arm64.dmg`，将「清言.app」拖入「Applications」。
 2. 打开清言，在「开始使用」点击「安装并启用清言」。
 3. 完成后点击「切换到清言」，或从系统输入菜单选择清言。
 4. 可以直接开始中文输入，也可以选择下面的增强组件。
@@ -76,7 +76,7 @@ GitHub 承载下载，macOS 则独立执行应用信任检查，首次打开可�
 ```sh
 QINGTYPE_SIGN_IDENTITY='Developer ID Application: ...' ./scripts/package-app.sh
 QINGTYPE_NOTARY_PROFILE='your-keychain-profile' \
-  ./scripts/notarize-app.sh build/distribution/QingType-0.6.3-arm64.dmg
+  ./scripts/notarize-app.sh build/distribution/QingType-0.6.4-arm64.dmg
 ```
 
 这些正式签名/公证分支尚未在真实身份上验证。公开发布前还需通过第三方授权审计、

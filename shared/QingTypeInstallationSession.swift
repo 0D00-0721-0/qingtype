@@ -68,8 +68,14 @@ final class QingTypeInstallationSession {
     return state
   }
 
-  func activate(app: URL) async throws {
+  func backUpCache() throws {
     _ = try QingTypeInputCache.backUp(root: cacheRoot, to: cacheBackup)
+  }
+
+  /// Registers and enables the input source. Call it only after the new
+  /// configuration is deployed: enabling lets macOS start the input service,
+  /// and a service compiling the same build directory concurrently corrupts it.
+  func enableInputSource(app: URL) async throws {
     _ = try await command(["--register-input-source"], app)
     for _ in 0..<3 {
       _ = try await command(["--enable-input-source", "org.qingtype.inputmethod.QingType.Hans"], app)
@@ -77,6 +83,11 @@ final class QingTypeInstallationSession {
       try await Task.sleep(nanoseconds: 800_000_000)
     }
     throw SettingsError.invalid("系统未确认启用清言输入源。")
+  }
+
+  func activate(app: URL) async throws {
+    try backUpCache()
+    try await enableInputSource(app: app)
   }
 
   func restore(app: URL, existed: Bool) async throws {

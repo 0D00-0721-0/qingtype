@@ -4,6 +4,49 @@ Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+## 0.6.4 update-lock fix — 2026-10-28
+
+A real GUI self-update from 0.6.2 to 0.6.3 failed on this Mac. The installer
+enabled the input source, macOS started the service, and that service held the
+shared data lock, so the exclusive deployment worker failed with "清言正在输入或
+管理数据". Rollback then swapped the new app into the staging directory and removed
+it while the live service still ran from that path. Recovery stopped the orphan
+service and re-ran `--deploy-user-data` with the installed 0.6.3; deployment
+succeeded and the user confirmed Chinese input worked again. No user dictionaries,
+learning databases or settings were modified.
+
+The fix stops the service before every deployment attempt, restarts it from the
+installed path after a successful install, and stops it before a rollback. The full
+`scripts/test.sh` in required Rime Ice fixture mode passes (173 checks) on the local
+0.6.4 build, and the DMG packaging plus `DistributionTests.py` pass. The real upgrade
+test prepared a pending-update receipt matching the GUI flow, replaced the 0.6.3
+application with the 0.6.4 build, and let the settings app finish the update while
+the input service was running. The receipt was consumed in about seven seconds; the
+installed input method reports 0.6.4, the service runs from
+`~/Library/Input Methods/QingType.app`, no `.qingtype-stage-*` directory remains, and
+deployment succeeded with a verified loaded model. The in-app download/verification
+step and real keyboard input after the upgrade still need user confirmation.
+
+A second failure appeared after that first fix, when the user pressed "重新检查并启用"
+to reinstall 0.6.4 over itself. Deployment failed with `dictionary 'qingtype_main'
+failed to compile` and wrote a 3,508-byte `qingtype_main.table.bin` where the healthy
+file was 13,041,144 bytes; every later deployment then failed the same way. Root
+cause: deployment still ran after the input source was enabled, so the service macOS
+started compiled the same `build/` directory concurrently with the deployment worker.
+Removing the truncated `qingtype_main.table.bin`, `qingtype_main.reverse.bin` and
+`qingtype_luna_pinyin_simp.prism.bin` and re-running `--deploy-user-data` rebuilt the
+13 MB table and succeeded.
+
+The ordering is now explicit: back up the cache, stop the service, deploy, then
+register and enable the input source, and finally start the service from the installed
+path. The same automated GUI reinstall was repeated with the reordered build while the
+service was running: the update receipt was consumed in about five seconds, the
+installed method reports 0.6.4, the service runs from the installed path, the compiled
+dictionary table stays 13,041,144 bytes, the newest deployment log has no errors, and
+no staging directory remains. The full local regression still passes (173 checks).
+The application does not yet detect and rebuild corrupted compiled artifacts
+automatically; the fix removes the known concurrent-write cause only.
+
 ## 0.6.3 preview publication — 2026-10-28
 
 Source commit 8eac967 (VERSION 0.6.3, clean working tree) passed the full local
