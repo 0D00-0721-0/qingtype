@@ -39,7 +39,8 @@ enum QingTypeInstallationCheck {
     "Contents/SharedSupport/luna_pinyin.dict.yaml",
   ]
 
-  static func inspect(destination: URL, payload: URL?) -> QingTypeInstallationStatus {
+  static func inspect(destination: URL, payload: URL?,
+                      signature: ((URL) throws -> Void)? = nil) -> QingTypeInstallationStatus {
     let manager = FileManager.default
     let payloadVersion = payload.flatMap { try? QingTypeAppInstallation.version(at: $0) }
     var problems: [String] = []
@@ -62,6 +63,9 @@ enum QingTypeInstallationCheck {
     }
     for relative in requiredFiles where !manager.fileExists(atPath: destination.appendingPathComponent(relative).path) {
       problems.append("缺少 \(relative)。")
+    }
+    if installedVersion != nil, let signature {
+      do { try signature(destination) } catch { problems.append(error.localizedDescription) }
     }
     if installedVersion == nil || !problems.isEmpty {
       return .init(state: .corrupted, installedVersion: installedVersion, payloadVersion: payloadVersion,
@@ -93,13 +97,30 @@ enum QingTypeInstallationCheck {
 
   /// Re-checks the program after a transaction. Only a matching version with all
   /// required files present counts as a successful install.
-  static func verify(destination: URL, expectedVersion: String?) throws {
+  static func verify(destination: URL, expectedVersion: String?,
+                     signature: ((URL) throws -> Void)? = nil) throws {
     let installed = try QingTypeAppInstallation.version(at: destination)
     if let expectedVersion, installed != expectedVersion {
       throw SettingsError.invalid("安装后的版本是 \(installed)，与安装包 \(expectedVersion) 不一致，安装已回退。")
     }
     for relative in requiredFiles where !FileManager.default.fileExists(atPath: destination.appendingPathComponent(relative).path) {
       throw SettingsError.invalid("安装后的输入法缺少 \(relative)，安装已回退。")
+    }
+    if let signature { try signature(destination) }
+  }
+
+  /// Full signature check for the installed program. Slower than the file
+  /// checks, so callers run it off the main thread during status refresh.
+  static func verifySignature(at app: URL) throws {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+    task.arguments = ["--verify", "--deep", "--strict", app.path]
+    task.standardOutput = FileHandle.nullDevice
+    task.standardError = FileHandle.nullDevice
+    try task.run()
+    task.waitUntilExit()
+    guard task.terminationStatus == 0 else {
+      throw SettingsError.invalid("输入法代码签名校验失败，建议使用「修复安装」。")
     }
   }
 }

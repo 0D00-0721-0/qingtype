@@ -7,6 +7,15 @@ extension SettingsModel {
     installationStatus = InstallationService.status()
     installedVersion = installationStatus?.installedVersion
     Task { inputEnabled = (try? await InstallationService.state().enabled) ?? false }
+    // The full signature check runs off the main thread; a broken install then
+    // switches the button to "修复安装" instead of "已安装".
+    Task.detached {
+      let full = InstallationService.status(verifyingSignature: true)
+      await MainActor.run {
+        self.installationStatus = full
+        self.installedVersion = full.installedVersion
+      }
+    }
   }
 
   var installAction: QingTypeInstallAction {

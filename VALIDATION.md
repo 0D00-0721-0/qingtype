@@ -25,12 +25,21 @@ install button remains.
 
 `tests/InstallationStatusTests.swift` covers state detection, action mapping, verification,
 leftover staging, downgrade refusal, repeated equal-version installs, corrupted repair and
-the concurrent install lock; the full regression passes 180 checks. Manual acceptance steps
-are listed in `docs/QA_CHECKLIST.md`. Backups from each reinstall still accumulate under
-`~/Library/QingType/backups`, status detection does not verify code signatures (signatures
-are checked when copying and replacing), corrupted compiled artifacts are still repaired
-manually, and rapid clicking, power loss and cross-application input still need real-machine
-checks.
+the concurrent install lock; `tests/MaintenanceRecoveryTests.swift` covers backup retention,
+build-artifact recovery and signature checks. The full regression passes 183 checks.
+
+Backup retention keeps the newest three `install-*`/`apply-*` transaction directories and
+never touches `learning-*`, `app-update-*`, plain files or symlinks; applying it on this Mac
+reduced 51 transaction backups to 3 and the backup directory from 1.4 GB to 1.1 GB (the rest
+is a deliberate acceptance snapshot). Status detection can run `codesign --verify --deep
+--strict`; the settings app does it off the main thread and turns the action into "repair"
+when it fails. A compile failure now moves derived `.bin`/`.yaml` files aside, rebuilds once
+and restores them if the rebuild still fails.
+
+Manual acceptance steps are listed in `docs/QA_CHECKLIST.md`. `app-update-*` backups still
+accumulate because they are tied to pending update receipts; the signature check completes
+asynchronously, so the first render may briefly show the file-level state; rapid clicking,
+power loss and cross-application input still need real-machine checks.
 
 ## 0.6.4 update-lock fix — 2026-10-28
 

@@ -107,9 +107,12 @@ enum DeploymentService {
       }
     }
     do {
-      return try await QingTypeConfigurationApply.apply(settings, to: QingTypePaths.userDirectory) {
+      let report = try await QingTypeConfigurationApply.apply(settings, to: QingTypePaths.userDirectory) {
         try await runWorker(appURL: appURL)
       }
+      _ = try? QingTypeBackupRetention.prune(in: QingTypePaths.userDirectory.appendingPathComponent("backups"),
+                                             prefixes: ["install-", "apply-"], keeping: 3)
+      return report
     } catch {
       if let failure = error as? QingTypeApplyError { shouldRestart = failure.recoveryVerified }
       throw error
@@ -117,6 +120,27 @@ enum DeploymentService {
   }
 
   static func runWorker(appURL: URL) async throws -> QingTypeDeploymentReport {
+    do {
+      return try await executeWorker(appURL: appURL)
+    } catch let error where QingTypeBuildRecovery.isCompileFailure(error) {
+      // A truncated table or prism from an interrupted compile poisons every
+      // later deployment. Move the derived artifacts aside, rebuild once, and
+      // put them back if the rebuild still fails.
+      let build = QingTypePaths.userDirectory.appendingPathComponent("build")
+      let backup = QingTypePaths.userDirectory.appendingPathComponent("backups/build-recovery-\(UUID())")
+      guard ((try? QingTypeBuildRecovery.moveDerivedArtifacts(in: build, to: backup)) ?? 0) > 0 else { throw error }
+      do {
+        let report = try await executeWorker(appURL: appURL)
+        QingTypeBuildRecovery.discard(backup)
+        return report
+      } catch {
+        try? QingTypeBuildRecovery.restore(from: backup, to: build)
+        throw error
+      }
+    }
+  }
+
+  private static func executeWorker(appURL: URL) async throws -> QingTypeDeploymentReport {
     let result = try await Task.detached {
       let task = Process()
       task.executableURL = appURL.appendingPathComponent("Contents/MacOS/QingType")

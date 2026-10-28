@@ -10,8 +10,11 @@
 - 修复损坏安装：无法读取版本的旧 bundle 不再被版本比较挡住，按修复路径替换并保留旧包备份（此前「修复安装」会直接抛错，实际不可用）。
 - UI：已安装且健康时显示「已安装」，另提供「重新安装…」并需确认；新增/更新/修复分别显示对应按钮；已安装较新版本时拒绝覆盖。模型卡片与模型页读取 `.gram` 的真实文件状态（存在/大小/SHA-256），缺失或损坏时提示，不再只依赖设置记录。
 - 更新检查：失败时清空候选版本并显示「检查失败」，不会残留旧的安装按钮；重复检查由 `busy` 串行化，自动检查仍受 24 小时间隔约束。
-- 测试：新增 `tests/InstallationStatusTests.swift`（状态检测、动作映射、安装后校验、遗留目录、降级保护、重复安装、损坏修复、并发安装锁），已接入 `scripts/test.sh`；错误注入类事务测试仍覆盖注册/启用失败后的恢复。完整回归 180 项 PASS。人工清单见 `docs/QA_CHECKLIST.md`。
-- 未解决：安装备份目录（`backups/install-*`）会随重装累积，未自动清理；状态检测不校验代码签名（签名只在安装和替换时校验）；编译产物损坏后仍不会自动重建；快速连点、断电恢复与跨应用输入需要按清单人工验收。
+- 测试：新增 `tests/InstallationStatusTests.swift`（状态检测、动作映射、安装后校验、遗留目录、降级保护、重复安装、损坏修复、并发安装锁）与 `tests/MaintenanceRecoveryTests.swift`（备份保留、编译产物重建、签名校验），已接入 `scripts/test.sh`；错误注入类事务测试仍覆盖注册/启用失败后的恢复。完整回归 183 项 PASS。人工清单见 `docs/QA_CHECKLIST.md`。
+- 备份保留：`QingTypeBackupRetention` 只清理 `install-*` / `apply-*` 目录，保留最新 3 个；不碰 `learning-*`、`app-update-*`、普通文件和符号链接。安装成功和每次「保存并应用」后执行。实际应用：本机 51 个事务备份清理到 3 个，`backups` 从 1.4GB 降到 1.1GB（剩余为手动验收快照和雾凇备份，未被清理）。
+- 签名进入状态检测：`QingTypeInstallationCheck.inspect(..., signature:)` 可执行 `codesign --verify --deep --strict`；设置界面在后台线程做完整校验，签名不符时状态变为 `corrupted`、按钮改为「修复安装」；安装事务在部署后也会校验签名。真实安装实测 `installedSameVersion`、无问题。
+- 编译产物自动重建：`QingTypeBuildRecovery` 在部署报错命中编译失败（`failed to compile` / 音节错误 / 构建 prism）时，把 `build/` 中的 `.bin`、`.yaml` 移到 `backups/build-recovery-*` 并重试一次；成功则丢弃旧产物，仍失败则放回，不触碰子目录与普通文件。
+- 仍未解决：`app-update-*` 备份不自动清理（与待完成更新回执绑定）；签名校验在后台异步完成，界面首次刷新可能短暂显示文件级状态；快速连点、断电恢复与跨应用输入仍需按清单人工验收。
 
 ## 0.6.3 升级失败与 0.6.4 修复（2026-10-28）
 

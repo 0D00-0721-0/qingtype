@@ -17,8 +17,9 @@ enum InstallationService {
   }
   static var installedVersion: String? { try? QingTypeAppInstallation.version(at: installedURL) }
 
-  static func status() -> QingTypeInstallationStatus {
-    QingTypeInstallationCheck.inspect(destination: installedURL, payload: payload)
+  static func status(verifyingSignature: Bool = false) -> QingTypeInstallationStatus {
+    QingTypeInstallationCheck.inspect(destination: installedURL, payload: payload,
+                                      signature: verifyingSignature ? QingTypeInstallationCheck.verifySignature : nil)
   }
 
   static func command(_ arguments: [String], app: URL = installedURL) async throws -> Data {
@@ -116,6 +117,7 @@ enum InstallationService {
       }
     }
     guard let report else { throw SettingsError.invalid("输入法尚未完成初始化。") }
+    pruneBackups()
     return report
   }
 
@@ -134,11 +136,19 @@ enum InstallationService {
       try await DeploymentService.stopInputMethod()
       return try await DeploymentService.runWorker(appURL: installedURL)
     }
-    try QingTypeInstallationCheck.verify(destination: installedURL, expectedVersion: expectedVersion)
+    try QingTypeInstallationCheck.verify(destination: installedURL, expectedVersion: expectedVersion,
+                                         signature: QingTypeInstallationCheck.verifySignature)
     try await session.enableInputSource(app: installedURL)
     // The transaction has committed; start from the installed path so the user
     // keeps a working input method without a stale staging executable.
     DeploymentService.startInputMethod(at: installedURL)
     return report
+  }
+
+  /// Keeps only the newest transaction backups. They are QingType-owned copies
+  /// that otherwise grow on every reinstall and every saved configuration.
+  private static func pruneBackups() {
+    let root = QingTypePaths.userDirectory.appendingPathComponent("backups")
+    _ = try? QingTypeBackupRetention.prune(in: root, prefixes: ["install-", "apply-"], keeping: 3)
   }
 }

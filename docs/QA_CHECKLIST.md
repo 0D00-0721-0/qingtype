@@ -23,6 +23,9 @@
 - [ ] 用旧安装包覆盖新版本：被拒绝，提示已安装较新版本，程序未被改动
 - [ ] 手动删除输入法里的 `Contents/Frameworks/librime.1.dylib`：显示「修复安装」
 - [ ] 修复后输入法可正常启动，用户数据不变
+- [ ] 篡改已安装程序（例如替换 `Contents/MacOS/QingType`）后重开设置：显示「修复安装」
+- [ ] 连续安装/保存多次后检查 `~/Library/QingType/backups`：`install-*`、`apply-*` 各不超过 3 个
+- [ ] 手动截断 `~/Library/QingType/build/qingtype_main.table.bin` 后保存并应用：自动重建成功，不需手工删除
 
 ## 失败与恢复
 
