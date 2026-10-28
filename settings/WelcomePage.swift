@@ -97,10 +97,23 @@ extension SettingsModel {
         var model = try await Task.detached { try QingTypeContent.importGrammar(from: file, into: QingTypePaths.userDirectory, expectedSHA256: expectedSHA256) }.value
         model.source = downloaded!.repository; model.release = downloaded!.release
         var updated = original
-        updated.models.removeAll { $0.id == model.id }; updated.models.append(model); updated.activeModelID = model.id
+        // An official update supersedes the previous official model for the same
+        // variant. Remove that record (and later its file) so repeated updates do
+        // not stack up several entries with the same display name.
+        let superseded = QingTypeModelAssets.supersededOfficialModels(
+          in: original.models, replacing: model, repository: QingTypeWanxiang.repository)
+        updated.models.removeAll { asset in superseded.contains { $0.id == asset.id } }
+        updated.models.removeAll { $0.id == model.id }
+        updated.models.append(model)
+        updated.activeModelID = model.id
         let report = try await DeploymentService.apply(updated)
         settings = updated; saved = updated; deployment = report
-        message = "万象模型已启用，之后输入可离线使用。"
+        refreshModelFileStates()
+        for old in superseded where !updated.models.contains(where: { $0.id == old.id }) {
+          try? FileManager.default.removeItem(at: QingTypePaths.userDirectory.appendingPathComponent(old.language + ".gram"))
+        }
+        message = superseded.isEmpty ? "万象模型已启用，之后输入可离线使用。"
+          : "万象模型已启用，并移除了 \(superseded.count) 个旧官方版本。"
       } catch {
         if Task.isCancelled || (error as? URLError)?.code == .cancelled {
           message = checkingModelUpdate ? "已取消模型更新检查。" : "已取消下载，当前输入设置保持不变。"

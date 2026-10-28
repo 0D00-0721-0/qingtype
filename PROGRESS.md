@@ -22,6 +22,7 @@
 - 签名进入状态检测：`QingTypeInstallationCheck.inspect(..., signature:)` 可执行 `codesign --verify --deep --strict`；设置界面在后台线程做完整校验，签名不符时状态变为 `corrupted`、按钮改为「修复安装」；安装事务在部署后也会校验签名。真实安装实测 `installedSameVersion`、无问题。
 - 编译产物自动重建：`QingTypeBuildRecovery` 在部署报错命中编译失败（`failed to compile` / 音节错误 / 构建 prism）时，把 `build/` 中的 `.bin`、`.yaml` 移到 `backups/build-recovery-*` 并重试一次；成功则丢弃旧产物，仍失败则放回，不触碰子目录与普通文件。
 - 修复模型页卡顿：模型文件状态（380MB/399MB 的 SHA-256）原先在 SwiftUI `body` 中同步计算，进入「语言模型」会阻塞主线程约 0.4–1 秒。现在改为 `SettingsModel.modelFileStates` 后台计算并缓存，切换分区时刷新，视图只读缓存。
+- 模型更新不再堆积：官方万象更新会替换同一变体的旧官方记录，并在部署成功后删除其 `.gram` 文件；用户本地导入的模型（无来源）保留。新增 `QingTypeModelAssets.supersededOfficialModels` 与回归断言。本机清理了 10-26 从本地导入的旧模型（380MB），备份设置后重新部署验证通过；当前只保留官方 LTS 模型（418MB）。
 - 仍未解决：`app-update-*` 备份不自动清理（与待完成更新回执绑定）；签名校验在后台异步完成，界面首次刷新可能短暂显示文件级状态；快速连点、断电恢复与跨应用输入仍需按清单人工验收。
 
 ## 0.6.3 升级失败与 0.6.4 修复（2026-10-28）

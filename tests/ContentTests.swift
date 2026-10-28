@@ -118,6 +118,20 @@ struct ContentTests {
     try rejects { try modelSettings.save(to: destination) }
     try expect(try Data(contentsOf: grammar) == grammarBytes, "symlink target is not modified")
 
+    // Official model updates supersede the previous official model only.
+    func asset(_ id: String, variant: String?, source: String?) -> GrammarAsset {
+      GrammarAsset(id: id, name: "m", language: "qingtype_model_" + id, byteCount: 1, sha256: id,
+                   variant: variant, source: source)
+    }
+    let repository = "amzxyz/rime-wanxiang-data"
+    let replacing = asset("new", variant: "hans", source: repository)
+    let superseded = QingTypeModelAssets.supersededOfficialModels(
+      in: [asset("old", variant: "hans", source: repository),
+           asset("local", variant: "hans", source: nil),
+           asset("hant", variant: "hant", source: repository)],
+      replacing: replacing, repository: repository)
+    try expect(superseded.map(\.id) == ["old"], "only the previous official model of the same variant is superseded")
+
     // Migration from the previous settings format preserves user's choices.
     let previous = Data("{\"schema\":\"luna_pinyin_simp\",\"fontSize\":21,\"layout\":\"stacked\"}".utf8)
     let migrated = try JSONDecoder().decode(QingTypeSettings.self, from: previous)

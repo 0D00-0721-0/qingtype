@@ -32,6 +32,15 @@ enum QingTypeModelFileState: Equatable {
   case invalid
 }
 
+enum QingTypeModelAssets {
+  /// Official updates replace the previous official model of the same variant;
+  /// user-imported models (no source) and other variants are left alone.
+  static func supersededOfficialModels(in models: [GrammarAsset], replacing model: GrammarAsset,
+                                       repository: String) -> [GrammarAsset] {
+    models.filter { $0.id != model.id && $0.variant == model.variant && $0.source == repository }
+  }
+}
+
 enum QingTypeContent {
   static func modelFileState(_ asset: GrammarAsset, in directory: URL) -> QingTypeModelFileState {
     let url = directory.appendingPathComponent(asset.language + ".gram")
