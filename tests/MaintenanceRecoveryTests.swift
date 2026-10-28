@@ -75,6 +75,40 @@ struct MaintenanceRecoveryTests {
     try expect(fm.fileExists(atPath: build.appendingPathComponent("qingtype_main.table.bin").path),
                "failed rebuild restores the previous artifacts")
 
+    let interrupted = root.appendingPathComponent("interrupted")
+    let interruptedBackup = root.appendingPathComponent("interrupted-backup")
+    try fm.createDirectory(at: interrupted, withIntermediateDirectories: true)
+    try Data("first".utf8).write(to: interrupted.appendingPathComponent("a.bin"))
+    try Data("second".utf8).write(to: interrupted.appendingPathComponent("b.yaml"))
+    var moves = 0
+    var interruptedError: Error?
+    do {
+      _ = try QingTypeBuildRecovery.moveDerivedArtifacts(in: interrupted, to: interruptedBackup, move: { source, target in
+        moves += 1
+        if moves == 2 { throw SettingsError.invalid("injected move failure") }
+        try fm.moveItem(at: source, to: target)
+      })
+    } catch { interruptedError = error }
+    try expect(interruptedError != nil && moves == 3, "partial move failure must trigger a rollback")
+    try expect(try Data(contentsOf: interrupted.appendingPathComponent("a.bin")) == Data("first".utf8),
+               "partial move rollback restores the original artifact")
+    try expect(try Data(contentsOf: interrupted.appendingPathComponent("b.yaml")) == Data("second".utf8),
+               "unmoved artifact remains intact")
+
+    var failedRollbackMoves = 0
+    var failedRollback: Error?
+    do {
+      _ = try QingTypeBuildRecovery.moveDerivedArtifacts(in: interrupted, to: root.appendingPathComponent("failed-rollback"), move: { source, target in
+        failedRollbackMoves += 1
+        if failedRollbackMoves >= 2 { throw SettingsError.invalid("injected failure") }
+        try fm.moveItem(at: source, to: target)
+      })
+    } catch { failedRollback = error }
+    try expect(failedRollback?.localizedDescription.contains("failed-rollback") == true,
+               "failed rollback must report the recoverable backup location")
+    try expect(fm.fileExists(atPath: root.appendingPathComponent("failed-rollback/a.bin").path),
+               "failed rollback retains the original artifact in the reported backup")
+
     // Signature verification separates a complete install from a damaged one.
     func makeApp(_ name: String) throws -> URL {
       let app = root.appendingPathComponent(name)

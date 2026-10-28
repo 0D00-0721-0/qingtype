@@ -131,14 +131,17 @@ enum DeploymentService {
       // put them back if the rebuild still fails.
       let build = QingTypePaths.userDirectory.appendingPathComponent("build")
       let backup = QingTypePaths.userDirectory.appendingPathComponent("backups/build-recovery-\(UUID())")
-      guard ((try? QingTypeBuildRecovery.moveDerivedArtifacts(in: build, to: backup)) ?? 0) > 0 else { throw error }
+      let moved = try QingTypeBuildRecovery.moveDerivedArtifacts(in: build, to: backup)
+      guard moved > 0 else { throw error }
       do {
         let report = try await executeWorker(appURL: appURL)
         QingTypeBuildRecovery.discard(backup)
         return report
       } catch {
-        try? QingTypeBuildRecovery.restore(from: backup, to: build)
-        throw error
+        let reason = error.localizedDescription
+        do { try QingTypeBuildRecovery.restore(from: backup, to: build) }
+        catch { throw SettingsError.invalid("重建失败且编译文件恢复未完成，请保留备份 \(backup.path)。\(reason)；\(error.localizedDescription)") }
+        throw SettingsError.invalid("重建失败，已恢复原编译文件。\(reason)")
       }
     }
   }

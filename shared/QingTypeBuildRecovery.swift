@@ -15,7 +15,8 @@ enum QingTypeBuildRecovery {
   /// Moves derived `.bin`/`.yaml` files from the build directory into a backup.
   /// Returns how many files were moved; symlinks and subdirectories are ignored.
   @discardableResult
-  static func moveDerivedArtifacts(in buildDirectory: URL, to backup: URL) throws -> Int {
+  static func moveDerivedArtifacts(in buildDirectory: URL, to backup: URL,
+                                   move: (URL, URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) }) throws -> Int {
     let manager = FileManager.default
     guard (try? buildDirectory.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
       throw SettingsError.invalid("编译目录包含符号链接，已停止重建。")
@@ -25,15 +26,30 @@ enum QingTypeBuildRecovery {
       return 0
     }
     let derived: Set<String> = ["bin", "yaml"]
-    var moved = 0
-    for url in entries where derived.contains(url.pathExtension.lowercased()) {
-      let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-      guard values?.isRegularFile == true, values?.isSymbolicLink != true else { continue }
-      try manager.createDirectory(at: backup, withIntermediateDirectories: true)
-      try manager.moveItem(at: url, to: backup.appendingPathComponent(url.lastPathComponent))
-      moved += 1
+    var moved: [URL] = []
+    do {
+      for url in entries.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) where derived.contains(url.pathExtension.lowercased()) {
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true else { continue }
+        try manager.createDirectory(at: backup, withIntermediateDirectories: true)
+        try move(url, backup.appendingPathComponent(url.lastPathComponent))
+        moved.append(url)
+      }
+    } catch {
+      let reason = error.localizedDescription
+      var failures: [String] = []
+      for original in moved.reversed() {
+        do {
+          guard !manager.fileExists(atPath: original.path) else { throw SettingsError.invalid("目标文件已重新出现。") }
+          try move(backup.appendingPathComponent(original.lastPathComponent), original)
+        } catch { failures.append("\(original.lastPathComponent)：\(error.localizedDescription)") }
+      }
+      if !failures.isEmpty {
+        throw SettingsError.invalid("编译文件恢复未完成，原文件保留在 \(backup.path)。\(reason)；\(failures.joined(separator: "；"))")
+      }
+      throw SettingsError.invalid("编译文件搬移失败，已恢复原文件。\(reason)")
     }
-    return moved
+    return moved.count
   }
 
   static func restore(from backup: URL, to buildDirectory: URL) throws {
