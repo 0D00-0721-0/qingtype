@@ -24,7 +24,7 @@
 - 现象：0.6.4 输入服务物理占用 431MB、RSS 522MB；同模型下鼠须管仅 27.7MB 物理占用。vmmap 显示清言有 ~398 个 1MB malloc 块。
 - 根因：`QingTypeContent.digest` 用 `FileHandle.read(upToCount: 1MB)` 循环计算 SHA-256，分块 Data 经 Foundation 桥接后留在自动释放池里；启动前校验 418MB 模型时把整个模型留在堆内且不释放。独立实验复现：同样循环后 RSS 406MB，加分块 autoreleasepool 后 8MB。
 - 修复：每次分块读取包进 `autoreleasepool`。实测部署 worker 峰值 43MB，服务物理占用 16–20MB、RSS 约 60MB，模型仍正常加载（`deployment.json` 成功、`modelVerified` 路径不变）。
-- 该泄漏由 0.6.3 的模型启动校验引入（0.6.2 无此路径），已发布的 0.6.4 仍含；下一个版本应包含此修复。
+- 该泄漏由 0.6.3 的模型启动校验引入（0.6.2 无此路径），已发布的 0.6.4 仍含；已升版本到 **0.6.5** 并重装本机（应用与输入法均为 0.6.5，实测物理占用 17.1MB、RSS 52MB，部署与模型加载正常）。
 
 ## 0.6.4 预览发布（2026-10-28）
 
