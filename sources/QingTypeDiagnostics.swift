@@ -305,8 +305,7 @@ enum QingTypeDiagnostics {
     let delegate = SquirrelApplicationDelegate()
     app.delegate = delegate
     try? QingTypeSettings.ensureInitialConfiguration()
-    delegate.setupRime()
-    delegate.startRime(fullCheck: false)
+    guard delegate.startRime(fullCheck: false) else { return }
     delegate.rimeAPI.join_maintenance_thread()
     delegate.loadSettings()
     // Application launch creates the panel, so present it after launch finishes.

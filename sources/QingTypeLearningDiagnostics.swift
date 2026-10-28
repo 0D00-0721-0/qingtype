@@ -89,6 +89,39 @@ enum QingTypeLearningDiagnostics {
         try expect(candidates().first?.text == learned, "repeated real selections promote the lower-weight candidate to first place")
       }
       try deploy(); try train(); stop()
+      // An already learned ranking must survive a model-integrity fallback.
+      // All data here is a temporary fixture, never the user's learning database.
+      let originalFiles = try settings.generatedFiles().keys.reduce(into: [String: Data]()) { result, name in
+        result[name] = try Data(contentsOf: directory.appendingPathComponent(name))
+      }
+      let compiledURL = directory.appendingPathComponent("build/\(settings.schema).schema.yaml")
+      let originalCompiled = try Data(contentsOf: compiledURL)
+      let modelSource = directory.appendingPathComponent("fallback-fixture.gram")
+      var modelBytes = Data(repeating: 0x61, count: 2048)
+      modelBytes.replaceSubrange(0..<17, with: Data("Rime::Grammar/1.0".utf8))
+      modelBytes.replaceSubrange(36..<44, with: [1, 0, 0, 0, 4, 0, 0, 0])
+      try modelBytes.write(to: modelSource)
+      let fixtureModel = try QingTypeContent.importGrammar(from: modelSource, into: directory)
+      var modelSettings = settings
+      modelSettings.models = [fixtureModel]; modelSettings.activeModelID = fixtureModel.id
+      try modelSettings.save(to: directory)
+      guard var compiled = try Yams.load(yaml: String(decoding: originalCompiled, as: UTF8.self)) as? [String: Any] else {
+        throw SettingsError.invalid("invalid fallback learning fixture")
+      }
+      compiled["grammar"] = ["language": fixtureModel.language]
+      try Data((try Yams.dump(object: compiled)).utf8).write(to: compiledURL, options: .atomic)
+      try Data("damaged".utf8).write(to: directory.appendingPathComponent(fixtureModel.language + ".gram"))
+      let fallbackDelegate = SquirrelApplicationDelegate()
+      defer { fallbackDelegate.shutdownRime() }
+      try expect(fallbackDelegate.startRime(fullCheck: false, directory: directory, logDirectory: directory),
+                 "model-integrity fallback starts with existing learning data")
+      session = api.create_session()
+      try expect(session != 0 && api.select_schema(session, settings.schema), "fallback opens the original schema")
+      try expect(candidates().first?.text == learned, "fallback preserves the previously learned ranking")
+      _ = api.destroy_session(session); session = 0
+      fallbackDelegate.shutdownRime()
+      for (name, contents) in originalFiles { try contents.write(to: directory.appendingPathComponent(name), options: .atomic) }
+      try originalCompiled.write(to: compiledURL, options: .atomic)
       let child = Process(); child.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
       child.arguments = ["--learning-restart-probe", directory.path, settings.schema]
       child.standardOutput = FileHandle.nullDevice; child.standardError = FileHandle.nullDevice

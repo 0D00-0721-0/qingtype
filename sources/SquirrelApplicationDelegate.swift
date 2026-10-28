@@ -14,6 +14,8 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate {
   var config: SquirrelConfig?
   var panel: SquirrelPanel?
   var enableNotifications = false
+  private var modelFallbackWorkspace: URL?
+  private var rimeInitialized = false
   func applicationWillFinishLaunching(_ notification: Notification) {
     panel = SquirrelPanel(position: .zero)
     addObservers()
@@ -26,10 +28,21 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate {
     panel?.hide()
   }
 
+  func cleanupModelFallback() {
+    if let modelFallbackWorkspace { try? FileManager.default.removeItem(at: modelFallbackWorkspace) }
+    modelFallbackWorkspace = nil
+  }
+
+  func shutdownRime() {
+    config?.close()
+    if rimeInitialized { rimeAPI.finalize(); rimeInitialized = false }
+    cleanupModelFallback()
+  }
+
   func deploy() {
     print("Start maintenance...")
     self.shutdownRime()
-    self.startRime(fullCheck: true)
+    guard self.startRime(fullCheck: true) else { NSApp.terminate(nil); return }
     self.loadSettings()
   }
 
@@ -68,9 +81,9 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate {
     if let msgText { NSLog("QingType: \(msgText)") }
   }
 
-  func setupRime() {
-    createDirIfNotExist(path: SquirrelApp.userDir)
-    createDirIfNotExist(path: SquirrelApp.logDir)
+  func setupRime(userDirectory: URL = SquirrelApp.userDir, logDirectory: URL = SquirrelApp.logDir, stagingDirectory: URL? = nil) {
+    createDirIfNotExist(path: userDirectory)
+    createDirIfNotExist(path: logDirectory)
     // swiftlint:disable identifier_name
     let notification_handler: @convention(c) (UnsafeMutableRawPointer?, RimeSessionId, UnsafePointer<CChar>?, UnsafePointer<CChar>?) -> Void = notificationHandler
     let context_object = Unmanaged.passUnretained(self).toOpaque()
@@ -79,8 +92,12 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate {
 
     var squirrelTraits = RimeTraits.rimeStructInit()
     squirrelTraits.setCString(Bundle.main.sharedSupportPath!, to: \.shared_data_dir)
-    squirrelTraits.setCString(SquirrelApp.userDir.path(), to: \.user_data_dir)
-    squirrelTraits.setCString(SquirrelApp.logDir.path(), to: \.log_dir)
+    squirrelTraits.setCString(userDirectory.path(), to: \.user_data_dir)
+    squirrelTraits.setCString(logDirectory.path(), to: \.log_dir)
+    if let stagingDirectory {
+      squirrelTraits.setCString(stagingDirectory.path, to: \.staging_dir)
+      squirrelTraits.setCString(stagingDirectory.path, to: \.prebuilt_data_dir)
+    }
     squirrelTraits.setCString("QingType", to: \.distribution_code_name)
     squirrelTraits.setCString("清言输入法", to: \.distribution_name)
     squirrelTraits.setCString(Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as! String, to: \.distribution_version)
@@ -88,9 +105,27 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate {
     rimeAPI.setup(&squirrelTraits)
   }
 
-  func startRime(fullCheck: Bool) {
+  @discardableResult
+  func startRime(fullCheck: Bool, directory: URL = SquirrelApp.userDir, logDirectory: URL = SquirrelApp.logDir) -> Bool {
+    let preparation: QingTypeRuntimeModel.Preparation
+    do { preparation = try QingTypeRuntimeModel.prepare(in: directory) }
+    catch {
+      let message = "输入服务未启动：无法安全准备语言模型。请打开清言设置检查模型。\(error.localizedDescription)"
+      NSLog("%@", message)
+      try? QingTypeRuntimeModel.recordStatus(message, in: directory)
+      return false
+    }
+    modelFallbackWorkspace = preparation.stagingDirectory?.deletingLastPathComponent()
+    setupRime(userDirectory: directory, logDirectory: logDirectory, stagingDirectory: preparation.stagingDirectory)
+    if let warning = preparation.warning { NSLog("%@", warning) }
+    do { try QingTypeRuntimeModel.recordStatus(preparation.warning, in: directory) }
+    catch { NSLog("无法记录模型状态：%@", error.localizedDescription) }
     print("Initializing la rime...")
     rimeAPI.initialize(nil)
+    rimeInitialized = true
+    // Recompilation would restore the original model reference into the
+    // temporary schema. Keep the fallback strictly on the verified snapshot.
+    if preparation.stagingDirectory != nil { return true }
     // check for configuration updates
     if rimeAPI.start_maintenance(fullCheck) {
       // update squirrel config
@@ -99,6 +134,7 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate {
     } else {
       // print("[DEBUG] maintenance fails")
     }
+    return true
   }
 
   func loadSettings() {
@@ -175,7 +211,7 @@ final class SquirrelApplicationDelegate: NSObject, NSApplicationDelegate {
 
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     print("Squirrel is quitting.")
-    rimeAPI.cleanup_all_sessions()
+    if rimeInitialized { rimeAPI.cleanup_all_sessions() }
     return .terminateNow
   }
 
@@ -231,11 +267,6 @@ private extension SquirrelApplicationDelegate {
     if !(msgTextLong ?? "").isEmpty || !(msgTextShort ?? "").isEmpty {
       panel?.updateStatus(long: msgTextLong ?? "", short: msgTextShort ?? "")
     }
-  }
-
-  func shutdownRime() {
-    config?.close()
-    rimeAPI.finalize()
   }
 
   func workspaceWillPowerOff(_: Notification) {

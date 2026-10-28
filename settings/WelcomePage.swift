@@ -3,6 +3,7 @@ import SwiftUI
 
 extension SettingsModel {
   func refreshInstallation() {
+    refreshRuntimeModelStatus()
     installedVersion = InstallationService.installedVersion
     Task { inputEnabled = (try? await InstallationService.state().enabled) ?? false }
   }
@@ -157,7 +158,9 @@ struct WanxiangCard: View {
           .font(.callout).foregroundStyle(.secondary)
         HStack {
           if let active = model.settings.activeModel {
-            Label("已启用：\(active.name)", systemImage: "checkmark.circle.fill").font(.callout).foregroundStyle(.secondary)
+            Label(model.runtimeModelWarning == nil ? "已启用：\(active.name)" : "最近启动未启用：\(active.name)",
+                  systemImage: model.runtimeModelWarning == nil ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+              .font(.callout).foregroundStyle(.secondary)
           }
           Button(model.settings.models.isEmpty ? "下载安装并启用万象" : "检查模型更新", action: model.checkWanxiangUpdate)
             .disabled(model.busy || !model.inputReady)

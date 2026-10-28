@@ -17,6 +17,8 @@ yaml_flags=(-I "$yaml_build_dir" -I "$yaml_build_dir/Modules" -I dependencies/.b
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/SettingsSafetyTests.swift "${yaml_flags[@]}" -o build/settings-tests
 build/settings-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/ContentTests.swift "${yaml_flags[@]}" -o build/content-tests
+swiftc -parse-as-library -swift-version 5 shared/*.swift tests/RuntimeModelTests.swift "${yaml_flags[@]}" -o build/runtime-model-tests
+build/runtime-model-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/PersonalDictionaryTests.swift "${yaml_flags[@]}" -o build/personal-dictionary-tests
 build/personal-dictionary-tests
 swiftc -parse-as-library -swift-version 5 shared/*.swift tests/RimeIceTests.swift "${yaml_flags[@]}" -o build/rime-ice-tests

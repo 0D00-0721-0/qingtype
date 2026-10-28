@@ -35,6 +35,7 @@ final class SettingsModel: ObservableObject {
   @Published var maintenance = QingTypeMaintenancePreferences()
   @Published var appUpdate: QingTypeAppUpdate?
   @Published var updateSummary: String?
+  @Published var runtimeModelWarning: String?
   var componentTask: Task<Void, Never>?
 
 
@@ -46,6 +47,7 @@ final class SettingsModel: ObservableObject {
       }
     }
     catch { loadFailed = true; failed = true; message = "无法读取设置：\(error.localizedDescription)" }
+    refreshRuntimeModelStatus()
     refreshInstallation()
     do {
       maintenance = try .load()
@@ -55,6 +57,9 @@ final class SettingsModel: ObservableObject {
   }
 
   var isDirty: Bool { settings != saved }
+  func refreshRuntimeModelStatus() {
+    runtimeModelWarning = QingTypeRuntimeModel.readStatus(in: QingTypePaths.userDirectory)?.message
+  }
   var inputReady: Bool {
     guard inputEnabled, let installedVersion, let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else { return false }
     return installedVersion.compare(current, options: .numeric) != .orderedAscending
@@ -246,7 +251,9 @@ struct SettingsView: View {
       }
       .background(Color(nsColor: .windowBackgroundColor))
     }
-
+    .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+      model.refreshRuntimeModelStatus()
+    }
   }
 
   private var subtitle: String {
@@ -384,6 +391,10 @@ struct SettingsView: View {
   private var deploymentStatus: some View {
     GroupBox("应用状态") {
       VStack(alignment: .leading, spacing: 10) {
+        if let warning = model.runtimeModelWarning {
+          Label("最近一次输入服务启动：\(warning)", systemImage: "exclamationmark.triangle.fill")
+            .foregroundStyle(Color.orange)
+        }
         if let report = model.deployment, model.deploymentIsCurrent {
           Label(report.message, systemImage: report.success ? "checkmark.circle.fill" : "exclamationmark.circle")
             .foregroundStyle(report.success ? Color.secondary : Color.orange)

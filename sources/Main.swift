@@ -257,8 +257,7 @@ struct SquirrelApp {
       } else {
         do { try QingTypeSettings.ensureInitialConfiguration() }
         catch { NSLog("Cannot prepare QingType settings: \(error)") }
-        NSApp.squirrelAppDelegate.setupRime()
-        NSApp.squirrelAppDelegate.startRime(fullCheck: false)
+        guard NSApp.squirrelAppDelegate.startRime(fullCheck: false) else { return }
         NSApp.squirrelAppDelegate.loadSettings()
         print("QingType reporting!")
       }
@@ -266,7 +265,7 @@ struct SquirrelApp {
       // finally run everything
       withExtendedLifetime(server) { app.run() }
       print("QingType is quitting...")
-      rimeAPI.finalize()
+      delegate.shutdownRime()
     }
     return
   }
