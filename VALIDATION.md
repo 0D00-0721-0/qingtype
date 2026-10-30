@@ -4,6 +4,35 @@ Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+## Independent QingType default-branch history — 2026-10-30
+
+The maintainer explicitly selected a fresh main history after backing up the old
+history. Root commit `ab03252` preserves the complete latest tree at `80f4709`,
+including its recent README, contribution/security guidance and issue templates;
+only PROGRESS.md differs. All product code, dependency pins and license/attribution
+files are byte-identical. The local origin now uses the repository's current name,
+`0D00-0721-0/qingyan-shurufa`.
+
+A complete Git bundle, refs, release/asset inventory and local uncommitted notes
+were saved outside the repository. An independent mirror restored from the bundle
+contains the old remote main tree and all six release tags. After a push protected
+by the exact old main SHA, the remote commit API reports one root commit authored
+by `0D00-0721-0`; all six release tags, release records and asset identifiers,
+sizes and digests are unchanged. The contributor-activity statistics API has now
+recomputed to `0D00-0721-0` with one commit. The ordinary contributor-list API still
+returns cached old authors; this is not reported as a completed homepage refresh.
+
+Local validation passed: four version tests, one build-identity test, 20 acceptance
+tests, a clean arm64 build, strict provenance/signature/mounted-DMG validation and
+18 packaged offline-engine checks. Build, full regression and strict package checks
+passed on macOS 14/15/26 Apple Silicon in
+[CI 41057130972](https://github.com/0D00-0721-0/qingyan-shurufa/actions/runs/41057130972)
+at root commit ab03252. Only validation documents follow this root commit.
+The ordinary contributor list still reports 28 cached accounts; GitHub documents
+that contributor displays may take about 24 hours to refresh after a history rewrite.
+No installed input service,
+user data, release asset or public version tag was replaced.
+
 ## Acceptance UUID and TIS query hardening — 2026-10-30
 
 Two separate fixes, `8ea21c5` and `7b090b7`, are limited to the requested contracts:
