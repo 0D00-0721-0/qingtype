@@ -4,6 +4,31 @@ Environment: Apple Silicon, macOS 27.0.1, Swift 6.4. The machine now has Xcode
 27.1 selected at `/Applications/Xcode.app/Contents/Developer`. The initial
 prototype was built earlier with Command Line Tools alone.
 
+## Caps Lock raw-pinyin commit — 2026-10-30
+
+The previous generated configuration inherited `Caps_Lock: clear`, reproduced as
+a failing real-engine test. It now uses commit_code. A second probe showed that
+Rime commits only the prefix when the caret is in the middle; a narrowly scoped
+Caps Lock preflight moves to the end only for an effective commit_code policy.
+Schema overrides and other events retain their behavior. Each factory/Ice profile
+passes 21 new engine checks, including Ice with Shift disabled. The complete local
+suite passes with 275 PASS output lines and no FAIL/SKIP, including the unchanged
+candidate and learning regressions. A clean df11bfa package passes strict DMG checks
+and 39 packaged factory-engine checks; macOS 14/15/26 all pass
+[CI 41061319357](https://github.com/0D00-0721-0/qingyan-shurufa/actions/runs/41061319357).
+
+Both installed programs now match that fixed package and its running image.
+Configuration was reapplied through the existing transaction, with settings values
+unchanged and Caps Lock compiled as commit_code. Offline user-data/program backups
+remain private; 66 protected file hashes match, and three learning database
+directories remain. Database metadata/files rotate during deployment and startup;
+byte-for-byte learning identity is not claimed. The user confirmed the requested
+Codex 26.1027.30824 (22943) composer test: nihao candidates followed by Caps Lock
+committing the literal nihao, then returning to Chinese and committing with Space.
+Before/after snapshots match the same artifact, full contents and running instance;
+this scoped result is recorded separately as F. Other hosts and real mid-composition
+caret cases remain unverified. See [the scoped record](docs/CAPS_LOCK_VALIDATION.md).
+
 ## Independent QingType default-branch history — 2026-10-30
 
 The maintainer explicitly selected a fresh main history after backing up the old
