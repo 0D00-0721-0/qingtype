@@ -75,6 +75,7 @@ final class QingTypeInputController: IMKInputController {
         // while NSFlagsChanged event has the flag changed already.
         // so it is necessary to revert kLockMask.
         rimeModifiers ^= kLockMask.rawValue
+        QingTypeInputModeSwitch.prepare(api: rimeAPI, session: session, key: rimeKeycode, modifiers: rimeModifiers)
         _ = processKey(rimeKeycode, modifiers: rimeModifiers)
       }
 

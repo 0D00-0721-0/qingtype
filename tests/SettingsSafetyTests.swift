@@ -1,4 +1,5 @@
 import Foundation
+import Yams
 
 @main
 struct SettingsSafetyTests {
@@ -22,6 +23,18 @@ struct SettingsSafetyTests {
     try settings.save(to: root)
     let restored = try QingTypeSettings.load(from: root)
     try expect(restored == settings, "settings and Unicode phrases survive restart")
+
+    for useShift in [true, false] {
+      var configured = settings
+      configured.useShift = useShift
+      let files = try configured.generatedFiles()
+      let object = try Yams.load(yaml: String(decoding: files["default.custom.yaml"] ?? Data(), as: UTF8.self)) as? [String: Any]
+      let patch = object?["patch"] as? [String: Any]
+      try expect(patch?["ascii_composer/switch_key/Caps_Lock"] as? String == "commit_code" &&
+                 patch?["ascii_composer/switch_key/Shift_L"] as? String == (useShift ? "inline_ascii" : "noop") &&
+                 patch?["ascii_composer/switch_key/Shift_R"] as? String == (useShift ? "inline_ascii" : "noop"),
+                 "Caps Lock preserves raw input independently of the Shift preference")
+    }
 
     let originalJSON = try Data(contentsOf: root.appendingPathComponent("settings.json"))
     settings.phrases.append(.init(code: "bad\ncode", text: "不能写入"))

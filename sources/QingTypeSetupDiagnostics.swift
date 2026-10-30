@@ -32,6 +32,7 @@ enum QingTypeSetupDiagnostics {
       let text = commit.text.map { String(cString: $0) }
       if got { _ = api.free_commit(&commit) }
       try expect(got && text == "你好", "factory selection commits exact Chinese text")
+      checks += try QingTypeInputModeDiagnostics.checkCapsLock(api: api, session: session, profile: "factory")
       let saved = try QingTypeSettings.load(from: root)
       try expect(saved.rimeIce == nil && saved.models.isEmpty && saved.dictionaries.isEmpty && saved.useSystemCandidates,
                  "first use leaves optional components absent and native candidates enabled")

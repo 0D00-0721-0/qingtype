@@ -127,6 +127,7 @@ struct QingTypeSettings: Codable, Equatable {
       schema_list:
         - schema: \(schema)
       menu/page_size: \(pageSize)
+      ascii_composer/switch_key/Caps_Lock: commit_code
       ascii_composer/switch_key/Shift_L: \(shift)
       ascii_composer/switch_key/Shift_R: \(shift)
 

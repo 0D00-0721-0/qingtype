@@ -21,6 +21,7 @@ enum QingTypeRimeIceDiagnostics {
       settings.rimeIce = try QingTypeRimeIce.install(from: package, into: directory, provenance: "isolated test")
       settings.schema = "rime_ice"
       settings.pageSize = 7
+      settings.useShift = false
       settings.personalWords = [.init(text: "清言星河样词", pinyin: "qing yan xing he yang ci", weight: 50000)]
       settings.phrases = [.init(code: "qqing", text: "清言快捷短语")]
       if let path = ProcessInfo.processInfo.environment["QINGTYPE_RIME_ICE_TEST_MODEL"] {
@@ -64,6 +65,7 @@ enum QingTypeRimeIceDiagnostics {
       let text = commit.text.map { String(cString: $0) }
       if got { _ = api.free_commit(&commit) }
       try expect(got && text == "清言星河样词", "personal Rime Ice selection commits exact text")
+      checks += try QingTypeInputModeDiagnostics.checkCapsLock(api: api, session: session, profile: "Rime Ice with Shift disabled")
       try expect(candidates("hello").contains { $0.text.lowercased() == "hello" }, "English dependency is loaded")
       let dates = candidates("rq").map(\.text)
       try expect(dates.contains { $0.range(of: "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$", options: .regularExpression) != nil }, "Lua date translator executes")
