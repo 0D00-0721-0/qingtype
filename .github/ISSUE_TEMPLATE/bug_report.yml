@@ -1,0 +1,81 @@
+name: 🐛 Bug 反馈
+description: 报告清言输入法的问题，帮助维护者复现和修复
+title: "[Bug] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你帮助改进 QingType。提交前请先搜索现有 Issues，避免重复反馈。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+      description: 请用简短的话说明发生了什么。
+      placeholder: 例如：点击“检查模型更新”后，界面一直停留在加载状态。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 按顺序写出可以稳定复现问题的操作。
+      placeholder: |
+        1. 打开清言……
+        2. 进入……
+        3. 点击……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+      description: 你原本希望发生什么？
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+      description: 实际发生了什么？是否出现错误提示？
+    validations:
+      required: true
+  - type: input
+    id: qingtype-version
+    attributes:
+      label: 清言版本
+      placeholder: 例如 0.6.5-preview.1
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS 版本
+      placeholder: 例如 macOS 15.6
+    validations:
+      required: true
+  - type: input
+    id: chip
+    attributes:
+      label: Mac 芯片
+      placeholder: 例如 M2 Pro
+    validations:
+      required: true
+  - type: input
+    id: schema
+    attributes:
+      label: 输入方案 / 相关组件
+      description: 如全拼、小鹤双拼、雾凇、万象模型；没有关联可留空。
+    validations:
+      required: false
+  - type: textarea
+    id: attachments
+    attributes:
+      label: 补充信息
+      description: 可附上不含个人信息的截图、错误提示或诊断摘要。
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        **隐私提醒：** 请勿提交真实输入内容、个人词库、模型文件、密码、访问令牌，或未经检查的完整日志。提交前请确认附件不包含隐私数据。

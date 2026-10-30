@@ -1,0 +1,49 @@
+name: QingType build and tests
+on:
+  push:
+    branches: [main, qingtype/main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: qingtype-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Fetch the pinned Rime Ice integration fixture
+        uses: actions/checkout@v6
+        with:
+          repository: iDvel/rime-ice
+          ref: da1fbe602e38f26db846fa10120ee64c2b0324c0
+          path: build/rime-ice-fixture
+      - name: Fetch the pinned Rime headers
+        run: git submodule update --init --depth 1 librime
+      - name: Build QingType and settings
+        run: ./scripts/build-dev.sh
+      - name: Run isolated engine, UI contract and data-safety checks
+        env:
+          QINGTYPE_REQUIRE_RIME_ICE_TEST: "1"
+          QINGTYPE_RIME_ICE_TEST_PACKAGE: ${{ github.workspace }}/build/rime-ice-fixture
+        run: ./scripts/test.sh
+      - name: Build and inspect the installable preview
+        env:
+          QINGTYPE_REQUIRE_CLEAN_BUILD: "1"
+        run: |
+          ./scripts/package-app.sh
+          python3 tests/DistributionTests.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QingType-${{ matrix.os }}
+          path: |
+            build/distribution/QingType-*.dmg
+            build/distribution/QingType-*.dmg.sha256
+          retention-days: 14

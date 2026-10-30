@@ -1,0 +1,123 @@
+{
+  "format": 1,
+  "runtimePackage": "dependencies/runtime.lock.json",
+  "sourceVersionEvidence": "Squirrel 1.1.2 action-install.sh and librime 1.16.0 SDK version-info.txt; recipe revisions, not proof of byte-identical package binaries",
+  "binaryEvidence": {
+    "librime": "1.16.0 via get_version",
+    "lua": "5.4.6 via plugin version string"
+  },
+  "sourceNoticeRecords": [
+    {
+      "repository": "google/leveldb",
+      "revision": "99b3c03b3284f5886f9ef9a4ef703d57373e61be",
+      "source": "LICENSE",
+      "licenseFile": "licenses/google-leveldb-LICENSE",
+      "sha256": "ccc19f1da0798ed666609b65a5b44dd8b3abe6fc08b9c0592eb76e82e174db19"
+    },
+    {
+      "repository": "lotem/librime-octagram",
+      "revision": "dfcc15115788c828d9dd7b4bff68067d3ce2ffb8",
+      "source": "LICENSE",
+      "licenseFile": "licenses/lotem-librime-octagram-LICENSE",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    },
+    {
+      "repository": "rime/librime-predict",
+      "revision": "920bd41ebf6f9bf6855d14fbe80212e54e749791",
+      "source": "LICENSE",
+      "licenseFile": "licenses/rime-librime-predict-LICENSE",
+      "sha256": "9b1bbdf15a381884b47dfd9422e68f6382170b2841c476afc076f2d448c7a59f"
+    },
+    {
+      "repository": "s-yata/marisa-trie",
+      "revision": "3e87d53b78e15f2f43783d5e376561a8c9722051",
+      "source": "COPYING.md",
+      "licenseFile": "licenses/s-yata-marisa-trie-COPYING.md",
+      "sha256": "edf58dab34c3dc239ba4ba2d5d3d844d8c5b442aa4dd1149fac81b2d8c6cb8d1"
+    },
+    {
+      "repository": "google/glog",
+      "revision": "7b134a5c82c0c0b5698bb6bf7a835b230c5638e4",
+      "source": "COPYING",
+      "licenseFile": "licenses/google-glog-COPYING",
+      "sha256": "136d48dea7a681413691f3db3098f6cf5ffaa3119d96d97bb83b8cff3ce38c4a"
+    },
+    {
+      "repository": "jbeder/yaml-cpp",
+      "revision": "2f86d13775d119edbb69af52e5f566fd65c6953b",
+      "source": "LICENSE",
+      "licenseFile": "licenses/jbeder-yaml-cpp-LICENSE",
+      "sha256": "aa6fcc27be034e41e21dd832f9175bfe694a48491d9e14ff0fa278e19ad14f1b"
+    },
+    {
+      "repository": "boostorg/boost",
+      "revision": "ef7fea34711a189472893b88205b1dd3c275677b",
+      "source": "LICENSE_1_0.txt",
+      "licenseFile": "licenses/boostorg-boost-LICENSE_1_0.txt",
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+    },
+    {
+      "repository": "BYVoid/OpenCC",
+      "revision": "556ed22496d650bd0b13b6c163be9814637970ae",
+      "source": "LICENSE",
+      "licenseFile": "licenses/BYVoid-OpenCC-LICENSE",
+      "sha256": "b534e465949558eec2597b04f5092b5e161236a68dfbfd04d547592ac3964308"
+    },
+    {
+      "repository": "BYVoid/OpenCC",
+      "revision": "556ed22496d650bd0b13b6c163be9814637970ae",
+      "source": "deps/marisa-0.2.6/COPYING.md",
+      "licenseFile": "licenses/BYVoid-OpenCC-deps-marisa-0.2.6-COPYING.md",
+      "sha256": "c0e214362b4dcf118371b02c87321f64a4d8317112d732b6d768167a635f383a"
+    },
+    {
+      "repository": "hchunhui/librime-lua",
+      "revision": "68f9c364a2d25a04c7d4794981d7c796b05ab627",
+      "source": "LICENSE",
+      "licenseFile": "licenses/hchunhui-librime-lua-LICENSE",
+      "sha256": "c6bd4f58b13ae9d45c5e53adddeea5049114a25862797c6c6f64920431eea249"
+    },
+    {
+      "repository": "hchunhui/librime-lua",
+      "revision": "9c53b362229766a97b83683b9541c46679118a90",
+      "source": "lua5.4/lua.h",
+      "licenseFile": "licenses/Lua-5.4.6-LICENSE.txt",
+      "sha256": "2b398835b6d819b7ee0b0ab024d9a7c140198f09070da09878c6824aca8e84df"
+    },
+    {
+      "repository": "yaml/libyaml",
+      "revision": "2c891fc7a770e8ba2fec34fc6b545c672beb37e6",
+      "source": "License",
+      "licenseFile": "licenses/libyaml-LICENSE.txt",
+      "sha256": "c40112449f254b9753045925248313e9270efa36d226b22d82d4cc6c43c57f29"
+    },
+    {
+      "repository": "rime/librime",
+      "revision": "a251145d3aafa33871824a40bbec04c966bd8b56",
+      "source": "include/COPYING.darts-clone",
+      "licenseFile": "licenses/Darts-clone-LICENSE.txt",
+      "sha256": "11bf6ca180d01e60656cd3cbe65cff95b738afe4ca5a8a66b9dd1ec594a41d2f"
+    },
+    {
+      "repository": "rime/librime",
+      "revision": "a251145d3aafa33871824a40bbec04c966bd8b56",
+      "source": "include/utf8.h",
+      "licenseFile": "licenses/utf8cpp-LICENSE.txt",
+      "sha256": "7ad2711724f69dfbd1a342905b9d2c7836b8f0ddfd916e35e9324ec826c5a948"
+    },
+    {
+      "repository": "jpsim/Yams",
+      "revision": "0d9ee7ea8c4ebd4a489ad7a73d5c6cad55d6fed3",
+      "source": "LICENSE",
+      "licenseFile": "licenses/Yams-LICENSE.txt",
+      "sha256": "0354b0ea403d2e78059c5ae0510a2cfae9f8eb306fcef094ac9fff5b47e20bed"
+    },
+    {
+      "repository": "rime/librime",
+      "revision": "a251145d3aafa33871824a40bbec04c966bd8b56",
+      "source": "include/X11/keysymdef.h",
+      "licenseFile": "licenses/X11-keysyms-LICENSE.txt",
+      "sha256": "06a9a459ad5b3cca5de30504ec5a89f4d5e8bb642c249392a5215fb916084ac1"
+    }
+  ]
+}

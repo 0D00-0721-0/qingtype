@@ -1,0 +1,86 @@
+name: Publish QingType preview
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag, for example v0.6.0-preview.1
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Validate immutable preview tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+$ ]]
+          git show-ref --verify "refs/tags/$RELEASE_TAG"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          python3 scripts/version.py check-tag "$RELEASE_TAG"
+      - uses: actions/checkout@v6
+        with:
+          repository: iDvel/rime-ice
+          ref: da1fbe602e38f26db846fa10120ee64c2b0324c0
+          path: build/rime-ice-fixture
+      - run: git submodule update --init --depth 1 librime
+      - run: ./scripts/build-dev.sh
+      - run: ./scripts/test.sh
+        env:
+          QINGTYPE_REQUIRE_RIME_ICE_TEST: "1"
+          QINGTYPE_RIME_ICE_TEST_PACKAGE: ${{ github.workspace }}/build/rime-ice-fixture
+      - name: Package and verify
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          QINGTYPE_REQUIRE_CLEAN_BUILD: "1"
+        run: |
+          ./scripts/package-app.sh
+          python3 tests/DistributionTests.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('build/distribution/清言.app/Contents')
+          assert json.loads((root / 'Resources/BuildInfo.json').read_text())['workingTreeClean']
+          PY
+      - uses: actions/upload-artifact@v4
+        if: matrix.os == 'macos-15'
+        with:
+          name: preview-${{ matrix.os }}
+          path: |
+            build/distribution/QingType-*.dmg
+            build/distribution/QingType-*.dmg.sha256
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: preview-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish verified preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          git archive --format=tar.gz --prefix=QingType/ HEAD > release-assets/QingType-source.tar.gz
+          gh release create "$RELEASE_TAG" release-assets/* --repo "$GH_REPO" --verify-tag --prerelease --title "清言 $RELEASE_TAG" --notes-file docs/RELEASE_NOTES.md

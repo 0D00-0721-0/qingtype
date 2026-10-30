@@ -1,0 +1,27 @@
+# QingType's simplified output variant of the upstream Xiaohe schema.
+__include: double_pinyin_flypy.schema:/
+schema:
+  schema_id: qingtype_double_pinyin
+  name: 小鹤双拼·简体
+  version: '0.1'
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 中文, 西文 ]
+  - name: full_shape
+    states: [ 半角, 全角 ]
+  - name: simplification
+    reset: 1
+    states: [ 漢字, 汉字 ]
+  - name: ascii_punct
+    states: [ 。，, ．， ]
+engine:
+  translators/+:
+    - table_translator@custom_phrase
+custom_phrase:
+  dictionary: ""
+  user_dict: custom_phrase
+  db_class: stabledb
+  enable_completion: false
+  enable_sentence: false
+  initial_quality: 1

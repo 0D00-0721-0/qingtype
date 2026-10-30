@@ -1,0 +1,68 @@
+import Foundation
+import Yams
+
+enum QingTypeMaintenance {
+  static func deploy(api: RimeApi_stdbool, directory: URL = QingTypePaths.userDirectory) throws -> QingTypeDeploymentReport {
+    let settings = try QingTypeSettings.load(from: directory)
+    try settings.validate()
+    try settings.verifyActiveModel(in: directory)
+    // Rime's schema freshness check has second-level timestamp granularity.
+    // Immediate off/on saves must not reuse the previous compiled switch value.
+    // Invalidate only this generated schema; user databases are never removed.
+    let build = directory.appendingPathComponent("build")
+    guard (try? build.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
+      throw SettingsError.invalid("编译目录包含符号链接，已停止部署。")
+    }
+    let compiled = build.appendingPathComponent(settings.schema + ".schema.yaml")
+    if FileManager.default.fileExists(atPath: compiled.path) { try FileManager.default.removeItem(at: compiled) }
+    let logs = directory.appendingPathComponent("deployment-logs/\(UUID())")
+    try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+    var traits = RimeTraits.rimeStructInit()
+    traits.setCString(Bundle.main.sharedSupportPath!, to: \.shared_data_dir)
+    traits.setCString(directory.path, to: \.user_data_dir)
+    traits.setCString(logs.path, to: \.log_dir)
+    traits.setCString("rime.qingtype.deploy", to: \.app_name)
+    api.setup(&traits)
+    api.initialize(nil)
+    defer { api.finalize() }
+    if api.start_maintenance(true) { api.join_maintenance_thread() }
+    // A stale compiled table can still answer nihao after a failed rebuild.
+    // Require the explicit schema/dictionary compiler result as well.
+    let userSchema = directory.appendingPathComponent(settings.schema + ".schema.yaml")
+    let schemaFile = FileManager.default.fileExists(atPath: userSchema.path) ? userSchema : URL(fileURLWithPath: Bundle.main.sharedSupportPath!).appendingPathComponent(settings.schema + ".schema.yaml")
+    let schemaReady = api.deploy_schema(schemaFile.path)
+    let configReady = api.deploy_config_file("squirrel.yaml", "config_version")
+    let session = api.create_session()
+    defer { _ = api.destroy_session(session) }
+    let selected = session != 0 && api.select_schema(session, settings.schema)
+    let sample = settings.schema == "qingtype_double_pinyin" ? "nihc" : "nihao"
+    for key in sample.utf8 { _ = api.process_key(session, Int32(key), 0) }
+    var context = RimeContext_stdbool.rimeStructInit()
+    let gotContext = api.get_context(session, &context)
+    let hasCandidates = gotContext && context.menu.num_candidates > 0
+    if gotContext { _ = api.free_context(&context) }
+    // Exercise sentence composition in addition to exact word lookup.
+    if settings.activeModel != nil {
+      _ = api.process_key(session, Int32(XK_Escape), 0)
+      let sentence = settings.schema == "qingtype_double_pinyin"
+        ? "wojbtmzdxtxijisrjiwhlo" : "wojintianzaixuexijisuanjiwangluo"
+      for key in sentence.utf8 { _ = api.process_key(session, Int32(key), 0) }
+      var sentenceContext = RimeContext_stdbool.rimeStructInit()
+      if api.get_context(session, &sentenceContext) { _ = api.free_context(&sentenceContext) }
+    }
+    let header = try Yams.load(yaml: String(contentsOf: compiled, encoding: .utf8)) as? [String: Any]
+    let translator = header?["translator"] as? [String: Any]
+    let prism = translator?["prism"] as? String ?? ""
+    let dictionary = translator?["dictionary"] as? String ?? ""
+    let expectedDictionary = settings.schema == "rime_ice" ? QingTypeRimeIce.dictionaryName : "qingtype_main"
+    let binaryReady = FileManager.default.fileExists(atPath: directory.appendingPathComponent("build/\(prism).prism.bin").path) &&
+      FileManager.default.fileExists(atPath: directory.appendingPathComponent("build/\(expectedDictionary).table.bin").path)
+    let success = schemaReady && configReady && selected && hasCandidates && binaryReady && dictionary == expectedDictionary
+    return QingTypeDeploymentReport(success: success,
+      settingsHash: try QingTypeContent.digest(of: directory.appendingPathComponent("settings.json")),
+      schema: settings.schema, dictionaryCount: settings.dictionaries.filter(\.enabled).count,
+      modelLanguage: settings.activeModel?.language,
+      message: success ? "词库已编译，输入方案检查通过。" : "部署检查未通过，请查看部署日志。",
+      logDirectory: logs.path)
+  }
+}
