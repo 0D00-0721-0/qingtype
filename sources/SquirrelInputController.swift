@@ -384,7 +384,7 @@ private extension QingTypeInputController {
     clearChord()
   }
 
-  func processKey(_ rimeKeycode: UInt32, modifiers rimeModifiers: UInt32) -> Bool {
+  func processKey(_ inputKey: UInt32, modifiers rimeModifiers: UInt32) -> Bool {
     // TODO add special key event preprocessing here
 
     // with linear candidate list, arrow keys may behave differently.
@@ -398,6 +398,7 @@ private extension QingTypeInputController {
       }
     }
 
+    let rimeKeycode = QingTypeKeyboardInput.prepare(api: rimeAPI, session: session, key: inputKey, modifiers: rimeModifiers)
     let handled = rimeAPI.process_key(session, Int32(rimeKeycode), Int32(rimeModifiers))
     // print("[DEBUG] rime_keycode: \(rimeKeycode), rime_modifiers: \(rimeModifiers), handled = \(handled)")
 
